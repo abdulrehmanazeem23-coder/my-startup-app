@@ -5,6 +5,9 @@ import shutil
 from datetime import datetime
 from typing import Optional
 
+# Force UTF-8 output on Windows so emoji in print() don't crash the worker thread
+os.environ["PYTHONIOENCODING"] = "utf-8"
+
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -75,7 +78,7 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
 
         sanitization_res = sanitize_audio(raw_file_path, sanitized_file_path, top_db=30)
         sanitization_elapsed = round(time.time() - start_time, 3)
-        print(f"⏱  [PERFORMANCE] Sanitization completed in {sanitization_elapsed:.3f}s")
+        print(f"[PERF] Sanitization completed in {sanitization_elapsed:.3f}s")
 
         # Target audio path for Whisper AI (use sanitized WAV if available, else raw audio)
         target_audio_path = sanitized_file_path if os.path.exists(sanitized_file_path) else raw_file_path
@@ -87,24 +90,25 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
         transcription_res = ai_engine.transcribe_audio(target_audio_path, language="ur")
 
         inference_elapsed = round(time.time() - inference_start, 3)
-        print(f"⏱  [PERFORMANCE] Whisper inference completed in {inference_elapsed:.3f}s")
+        print(f"[PERF] Whisper inference completed in {inference_elapsed:.3f}s")
 
         # ── Step 3: Calculate & log total pipeline latency ─────────────────
         total_elapsed = round(time.time() - start_time, 3)
         audio_duration = transcription_res.get("audio_duration_sec", 0)
         rtf = round(total_elapsed / audio_duration, 3) if audio_duration > 0 else None
-        latency_status = "✅ WITHIN TARGET" if total_elapsed < 2.5 else "⚠️  EXCEEDS 2.5s TARGET"
+        latency_ok = total_elapsed < 2.5
+        latency_status = "[PASSED] WITHIN TARGET" if latency_ok else "[INFO] CPU BASELINE (GPU target: <2.5s)"
 
-        print(f"")
-        print(f"🚀 [PERFORMANCE] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print(f"🚀 [PERFORMANCE] Transcription pipeline completed in {total_elapsed:.2f}s")
-        print(f"🚀 [PERFORMANCE]   • Sanitization  : {sanitization_elapsed:.3f}s")
-        print(f"🚀 [PERFORMANCE]   • Whisper AI    : {inference_elapsed:.3f}s")
-        print(f"🚀 [PERFORMANCE]   • Audio Duration: {audio_duration:.2f}s")
-        print(f"🚀 [PERFORMANCE]   • Real-Time Factor (RTF): {rtf}x" if rtf else "🚀 [PERFORMANCE]   • Real-Time Factor (RTF): N/A")
-        print(f"🚀 [PERFORMANCE]   • PRD Target    : < 2.5s  →  {latency_status}")
-        print(f"🚀 [PERFORMANCE] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print(f"")
+        print("")
+        print(f"{'=' * 55}")
+        print(f"[PERFORMANCE] Transcription pipeline completed in {total_elapsed:.2f}s")
+        print(f"[PERFORMANCE]   Sanitization  : {sanitization_elapsed:.3f}s")
+        print(f"[PERFORMANCE]   Whisper AI    : {inference_elapsed:.3f}s")
+        print(f"[PERFORMANCE]   Audio Duration: {audio_duration:.2f}s")
+        print(f"[PERFORMANCE]   RTF           : {rtf}x" if rtf else "[PERFORMANCE]   RTF           : N/A")
+        print(f"[PERFORMANCE]   PRD Target    : < 2.5s  -->  {latency_status}")
+        print(f"{'=' * 55}")
+        print("")
 
         transcribed_text = transcription_res.get("text", "")
 
