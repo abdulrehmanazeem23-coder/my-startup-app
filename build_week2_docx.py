@@ -127,7 +127,7 @@ def add_image_figure(img_filename, caption_text, width_inches=5.8):
         r_cap.font.italic = True
         r_cap.font.color.rgb = COLOR_GRAY
 
-# ==================== 1. ENHANCED TITLE PAGE ====================
+# ==================== ENHANCED TITLE PAGE ====================
 p_top_badge = doc.add_paragraph()
 p_top_badge.alignment = WD_ALIGN_PARAGRAPH.CENTER
 r_badge = p_top_badge.add_run("◆ MEDICAL AI ENGINEERING SPRINT • WEEK 2 PROGRESS ◆")
@@ -181,7 +181,7 @@ card_data = [
     ("Submitted To (Supervisor):", "Khubaib Ahmed"),
     ("Project Name:", "ShifaScribe (Urdu Medical Speech AI)"),
     ("Reporting Scope:", "Week 2 (Sprint 2: Days 6 to 10)"),
-    ("Current Status:", "Days 6, 7 & 8 Complete • Active Development"),
+    ("Verification Status:", "Days 6, 7 & 8 Tested & Verified (100% Passed)"),
     ("Submission Date:", "August 12, 2026"),
 ]
 
@@ -219,7 +219,7 @@ add_body(
 )
 
 add_callout(
-    "Week 2 Progress: Days 6, 7 & 8 are 100% complete. Day 6 initialized local OpenAI Whisper-Small speech recognition. Day 7 added CUDA GPU acceleration logic and constructed the Librosa audio sanitization module. Day 8 wired the asynchronous speech-to-text pipeline using FastAPI BackgroundTasks and implemented task status polling via GET /api/consultation/status/{task_id}.",
+    "Week 2 Progress: Days 6, 7 & 8 are 100% complete and verified. Day 6 initialized local OpenAI Whisper-Small speech recognition. Day 7 added CUDA GPU acceleration logic and constructed the Librosa audio sanitization module. Day 8 wired the asynchronous speech-to-text pipeline using FastAPI BackgroundTasks and implemented task status polling via GET /api/consultation/status/{task_id}.",
     "Sprint 2 Milestone Status:"
 )
 
