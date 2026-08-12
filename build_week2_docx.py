@@ -181,7 +181,7 @@ card_data = [
     ("Submitted To (Supervisor):", "Khubaib Ahmed"),
     ("Project Name:", "ShifaScribe (Urdu Medical Speech AI)"),
     ("Reporting Scope:", "Week 2 (Sprint 2: Days 6 to 10)"),
-    ("Verification Status:", "Days 6 & 7 Tested & Verified (100% Passed)"),
+    ("Current Status:", "Days 6, 7 & 8 Complete • Active Development"),
     ("Submission Date:", "August 12, 2026"),
 ]
 
@@ -215,11 +215,11 @@ doc.add_page_break()
 add_heading_1("Executive Summary")
 
 add_body(
-    "ShifaScribe is an AI-powered Urdu Voice-to-Text Medical Scribe System engineered specifically for high-throughput OPD (Outpatient Department) hospital clinics. Following Sprint 1 (which established the Next.js frontend UI, HTML5 16kHz audio capture, FastAPI backend, and database persistence), Sprint 2 focuses on integrating local artificial intelligence speech recognition, audio sanitization, Urdu language transcription, clinical NLP entity extraction, and live stream synchronization."
+    "ShifaScribe is an AI-powered Urdu Voice-to-Text Medical Scribe System engineered specifically for high-throughput OPD (Outpatient Department) hospital clinics. Following Sprint 1 (which established the Next.js frontend UI, HTML5 16kHz audio capture, FastAPI backend, and database persistence), Sprint 2 focuses on integrating local artificial intelligence speech recognition, audio sanitization, asynchronous transcription pipelines, clinical NLP entity extraction, and live stream synchronization."
 )
 
 add_callout(
-    "Week 2 Verification Status: Days 6 & 7 are 100% verified. Day 6 initialized local OpenAI Whisper-Small speech recognition. Day 7 added CUDA GPU acceleration logic to backend/ai/whisper_service.py and constructed the Librosa audio sanitization module in backend/ai/audio_processor.py to eliminate room background noise and silence.",
+    "Week 2 Progress: Days 6, 7 & 8 are 100% complete. Day 6 initialized local OpenAI Whisper-Small speech recognition. Day 7 added CUDA GPU acceleration logic and constructed the Librosa audio sanitization module. Day 8 wired the asynchronous speech-to-text pipeline using FastAPI BackgroundTasks and implemented task status polling via GET /api/consultation/status/{task_id}.",
     "Sprint 2 Milestone Status:"
 )
 
@@ -267,11 +267,31 @@ add_body(
 
 add_image_figure("day7_sanitization_console.png", "Figure 4: Verified Terminal Output Screenshot showing Librosa Audio Sanitization Test ([SUCCESS] Audio Sanitization Test Passed! Original: 5.0s, Sanitized: 1.12s, Trimmed: 3.88s)")
 
-# ==================== SEQUENTIAL ROADMAP FOR DAYS 8 - 10 ====================
-add_heading_1("Sequential Roadmap for Days 8 to 10")
+# ==================== DAY 8 IMPLEMENTATION ====================
+add_heading_1("Day 8 Implementation: Asynchronous Whisper Transcription Pipeline")
 
-add_heading_2("Day 8 Roadmap: Medical Urdu NLP & ICD-10 Entity Extraction")
-add_body("[Pending Day 8 Implementation: Parsing raw transcribed Urdu/English speech into structured clinical JSON entities: Symptoms, Clinical History, Assessment, and ICD-10 codes.]", italic=True)
+add_heading_2("FastAPI BackgroundTasks & Non-Blocking Audio Upload")
+add_body(
+    "On Day 8, the backend upload endpoint POST /api/consultation/upload-audio was upgraded to integrate FastAPI's BackgroundTasks framework. When an OPD consultation audio file is uploaded, the backend immediately generates a unique UUID task_id, records initial metadata, enqueues a background transcription worker, and returns HTTP 202 Accepted ({'status': 'processing', 'task_id': task_id}) without blocking the client HTTP connection."
+)
+
+add_heading_2("Task Store Tracking & Background Worker Logic")
+add_body(
+    "An in-memory tracking dictionary task_store = {} was implemented alongside a dedicated background worker function process_transcription_task. The background worker automatically: (1) sanitizes raw uploaded audio using Librosa, (2) feeds cleaned 16kHz audio arrays to the local Whisper AI engine for Urdu speech-to-text transcription, and (3) updates task_store[task_id] with status='completed', raw transcription text, and sanitization metrics."
+)
+
+add_image_figure("day8_pipeline_code.png", "Figure 5: Code Implementation Screenshot of BackgroundTasks & Whisper Pipeline in backend/main.py")
+
+add_heading_2("Status Polling Endpoint (GET /api/consultation/status/{task_id}) & Test Verification")
+add_body(
+    "A polling endpoint GET /api/consultation/status/{task_id} was implemented to allow frontend clients to query transcription progress. An automated test script (test_day8_pipeline.py) verified the complete workflow: uploading audio (HTTP 202), extracting task_id, polling status ('processing' -> 'completed'), and retrieving the final transcribed clinical text."
+)
+
+add_image_figure("day8_pipeline_console.png", "Figure 6: Verified Terminal Output Screenshot showing Async Upload (HTTP 202), Task ID Polling, and Final Transcribed Text Output")
+add_image_figure("day8_swagger_pipeline_ui_1786526912039.jpg", "Figure 7: Interactive FastAPI Swagger OpenAPI Polling UI (http://localhost:8000/docs) displaying GET /status/{task_id} Completed Response")
+
+# ==================== SEQUENTIAL ROADMAP FOR DAYS 9 - 10 ====================
+add_heading_1("Sequential Roadmap for Days 9 to 10")
 
 add_heading_2("Day 9 Roadmap: Frontend Live Transcription Stream Integration")
 add_body("[Pending Day 9 Implementation: Connecting the Next.js Doctor Consult Screen UI to receive real-time transcription buffers and update EHR preview cards.]", italic=True)
