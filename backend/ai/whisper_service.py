@@ -11,10 +11,12 @@ class WhisperTranscriber:
         if self.is_cuda_available:
             self.device_id = 0
             self.device_name = torch.cuda.get_device_name(0)
-            self.device_label = f"CUDA GPU ({self.device_name})"
+            self.device = f"cuda:0 ({self.device_name})"
+            self.device_label = self.device
         else:
             self.device_id = -1
             self.device_name = "CPU"
+            self.device = "cpu"
             self.device_label = "CPU Fallback"
         
         print(f"[ShifaScribe AI] Initializing Whisper model '{self.model_name}'...")

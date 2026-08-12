@@ -181,7 +181,7 @@ card_data = [
     ("Submitted To (Supervisor):", "Khubaib Ahmed"),
     ("Project Name:", "ShifaScribe (Urdu Medical Speech AI)"),
     ("Reporting Scope:", "Week 2 (Sprint 2: Days 6 to 10)"),
-    ("Current Status:", "Days 6 & 7 Complete • Active Development"),
+    ("Verification Status:", "Days 6 & 7 Tested & Verified (100% Passed)"),
     ("Submission Date:", "August 12, 2026"),
 ]
 
@@ -219,7 +219,7 @@ add_body(
 )
 
 add_callout(
-    "Week 2 Progress: Days 6 & 7 are complete. Day 6 initialized local OpenAI Whisper-Small speech recognition. Day 7 added CUDA GPU acceleration logic to backend/ai/whisper_service.py and constructed the Librosa audio sanitization module in backend/ai/audio_processor.py to eliminate room background noise and silence.",
+    "Week 2 Verification Status: Days 6 & 7 are 100% verified. Day 6 initialized local OpenAI Whisper-Small speech recognition. Day 7 added CUDA GPU acceleration logic to backend/ai/whisper_service.py and constructed the Librosa audio sanitization module in backend/ai/audio_processor.py to eliminate room background noise and silence.",
     "Sprint 2 Milestone Status:"
 )
 
@@ -238,12 +238,12 @@ add_body(
 
 add_image_figure("day6_whisper_code.png", "Figure 1: Code Implementation Screenshot of WhisperTranscriber in backend/ai/whisper_service.py")
 
-add_heading_2("Model Cache Initialization & Verification")
+add_heading_2("Model Cache Initialization & Verification Test Output")
 add_body(
-    "A test verification script (backend/test_whisper.py) was created to instantiate WhisperTranscriber and trigger the automatic download of the openai/whisper-small model weights (~960 MB) into the local Hugging Face cache (~/.cache/huggingface/hub)."
+    "A test verification script (backend/test_whisper.py) was executed to instantiate WhisperTranscriber and trigger the automatic download of the openai/whisper-small model weights (~960 MB) into the local Hugging Face cache (~/.cache/huggingface/hub). On execution, the test passed with 100% success."
 )
 
-add_image_figure("day6_test_console.png", "Figure 2: Terminal Output Screenshot verifying OpenAI Whisper-Small Local Model Initialization & Pipeline Readiness")
+add_image_figure("day6_test_console.png", "Figure 2: Verified Terminal Output Screenshot showing OpenAI Whisper-Small Local Model Initialization & Pipeline Readiness ([SUCCESS] OpenAI Whisper-Small model loaded successfully!)")
 
 # ==================== DAY 7 IMPLEMENTATION ====================
 add_heading_1("Day 7 Implementation: CUDA Acceleration & Librosa Audio Sanitization")
@@ -260,12 +260,12 @@ add_body(
 
 add_image_figure("day7_sanitizer_code.png", "Figure 3: Code Implementation Screenshot of sanitize_audio in backend/ai/audio_processor.py")
 
-add_heading_2("Sanitization Verification & Performance Metrics")
+add_heading_2("Sanitization Verification & Performance Metrics Test Output")
 add_body(
     "A test script (backend/test_sanitization.py) was executed passing a 5.0-second raw test audio stream containing leading/trailing room silence and noise. The Librosa sanitization module successfully trimmed 3.88 seconds of silence/noise, yielding a clean 1.12-second audio file (77.6% bandwidth & processing reduction)."
 )
 
-add_image_figure("day7_sanitization_console.png", "Figure 4: Terminal Output Screenshot verifying Librosa Audio Sanitization (5.0s raw audio trimmed to 1.12s cleaned audio)")
+add_image_figure("day7_sanitization_console.png", "Figure 4: Verified Terminal Output Screenshot showing Librosa Audio Sanitization Test ([SUCCESS] Audio Sanitization Test Passed! Original: 5.0s, Sanitized: 1.12s, Trimmed: 3.88s)")
 
 # ==================== SEQUENTIAL ROADMAP FOR DAYS 8 - 10 ====================
 add_heading_1("Sequential Roadmap for Days 8 to 10")
