@@ -1,0 +1,39 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# python virtualenvs & cache
+venv/
+.venv/
+__pycache__/
+*.pyc
+backend/venv/
+backend/__pycache__/
+
+# database & local storage
+*.db
+*.sqlite
+*.sqlite3
+backend/storage/audio/*
+!backend/storage/audio/.gitkeep
+
+# next.js
+/.next/
+/out/
+
+# production & build
+/build
+/dist
+
+# misc & OS
+.DS_Store
+*.pem
+*.log
+.env
+.env.local
+.env.development.local
+.env.production.local
+
+# typescript
+*.tsbuildinfo
