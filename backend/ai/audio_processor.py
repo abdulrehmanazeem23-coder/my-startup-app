@@ -27,7 +27,7 @@ def convert_to_wav_16k(input_path: str, target_wav_path: str):
     if result.returncode != 0:
         raise RuntimeError(f"FFmpeg conversion failed: {result.stderr.decode('utf-8', errors='ignore')}")
 
-def sanitize_audio(input_path: str, output_path: str, top_db: int = 20) -> dict:
+def sanitize_audio(input_path: str, output_path: str, top_db: int = 30) -> dict:
     """
     Sanitizes raw audio input by trimming leading/trailing silence and ambient background room noise.
     Handles WebM browser streams by converting to 16kHz WAV format first.

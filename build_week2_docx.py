@@ -11,363 +11,242 @@ output_docx = r"c:\Users\Sys\Desktop\my-startup-app\ShifaScribe_Week2_Report.doc
 
 doc = docx.Document()
 
-# Page Setup - Normal Margins (1 inch)
 for section in doc.sections:
     section.top_margin = Inches(1.0)
     section.bottom_margin = Inches(1.0)
     section.left_margin = Inches(1.0)
     section.right_margin = Inches(1.0)
 
-# Colors
-COLOR_NAVY = RGBColor(15, 23, 42)      # #0F172A
-COLOR_TEAL = RGBColor(13, 148, 136)    # #0D9488
-COLOR_EMERALD = RGBColor(5, 150, 105)  # #059669
-COLOR_GRAY = RGBColor(100, 116, 139)   # #64748B
-COLOR_DARK = RGBColor(30, 41, 59)      # #1E293B
+COLOR_NAVY    = RGBColor(15, 23, 42)
+COLOR_TEAL    = RGBColor(13, 148, 136)
+COLOR_EMERALD = RGBColor(5, 150, 105)
+COLOR_GRAY    = RGBColor(100, 116, 139)
+COLOR_DARK    = RGBColor(30, 41, 59)
 
-def set_cell_background(cell, fill_hex):
+def set_bg(cell, hex_color):
     tcPr = cell._element.get_or_add_tcPr()
-    shd = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{fill_hex}"/>')
-    tcPr.append(shd)
+    tcPr.append(parse_xml(f'<w:shd {nsdecls("w")} w:fill="{hex_color}"/>'))
 
-def add_title(text):
+def h1(text):
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run(text)
-    run.font.name = 'Calibri'
-    run.font.size = Pt(28)
-    run.font.bold = True
-    run.font.color.rgb = COLOR_NAVY
-    p.paragraph_format.space_before = Pt(40)
-    p.paragraph_format.space_after = Pt(8)
-    return p
+    r = p.add_run(text)
+    r.font.name, r.font.size, r.font.bold, r.font.color.rgb = "Calibri", Pt(18), True, COLOR_NAVY
+    p.paragraph_format.space_before, p.paragraph_format.space_after = Pt(18), Pt(8)
 
-def add_subtitle(text):
+def h2(text):
     p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run(text)
-    run.font.name = 'Calibri'
-    run.font.size = Pt(16)
-    run.font.bold = True
-    run.font.color.rgb = COLOR_TEAL
-    p.paragraph_format.space_after = Pt(24)
-    return p
+    r = p.add_run(text)
+    r.font.name, r.font.size, r.font.bold, r.font.color.rgb = "Calibri", Pt(13), True, COLOR_TEAL
+    p.paragraph_format.space_before, p.paragraph_format.space_after = Pt(12), Pt(5)
 
-def add_heading_1(text):
+def body(text, italic=False):
     p = doc.add_paragraph()
-    run = p.add_run(text)
-    run.font.name = 'Calibri'
-    run.font.size = Pt(18)
-    run.font.bold = True
-    run.font.color.rgb = COLOR_NAVY
-    p.paragraph_format.space_before = Pt(18)
-    p.paragraph_format.space_after = Pt(8)
-    return p
-
-def add_heading_2(text):
-    p = doc.add_paragraph()
-    run = p.add_run(text)
-    run.font.name = 'Calibri'
-    run.font.size = Pt(13)
-    run.font.bold = True
-    run.font.color.rgb = COLOR_TEAL
-    p.paragraph_format.space_before = Pt(14)
-    p.paragraph_format.space_after = Pt(6)
-    return p
-
-def add_body(text, bold=False, italic=False):
-    p = doc.add_paragraph()
-    run = p.add_run(text)
-    run.font.name = 'Calibri'
-    run.font.size = Pt(11)
-    run.font.color.rgb = COLOR_DARK
-    run.font.bold = bold
-    run.font.italic = italic
+    r = p.add_run(text)
+    r.font.name, r.font.size, r.font.color.rgb, r.font.italic = "Calibri", Pt(11), COLOR_DARK, italic
     p.paragraph_format.space_after = Pt(6)
     p.paragraph_format.line_spacing = 1.15
-    return p
 
-def add_callout(text, bold_title=""):
+def callout(text, label=""):
     p = doc.add_paragraph()
-    p.paragraph_format.left_indent = Inches(0.4)
-    p.paragraph_format.right_indent = Inches(0.4)
-    p.paragraph_format.space_before = Pt(8)
-    p.paragraph_format.space_after = Pt(8)
-    
-    if bold_title:
-        r_title = p.add_run(bold_title + " ")
-        r_title.font.name = 'Calibri'
-        r_title.font.size = Pt(11)
-        r_title.font.bold = True
-        r_title.font.color.rgb = COLOR_EMERALD
-        
-    r_text = p.add_run(text)
-    r_text.font.name = 'Calibri'
-    r_text.font.size = Pt(10.5)
-    r_text.font.italic = True
-    r_text.font.color.rgb = COLOR_DARK
-    return p
+    p.paragraph_format.left_indent, p.paragraph_format.right_indent = Inches(0.4), Inches(0.4)
+    p.paragraph_format.space_before, p.paragraph_format.space_after = Pt(6), Pt(8)
+    if label:
+        rl = p.add_run(label + " ")
+        rl.font.name, rl.font.size, rl.font.bold, rl.font.color.rgb = "Calibri", Pt(11), True, COLOR_EMERALD
+    rt = p.add_run(text)
+    rt.font.name, rt.font.size, rt.font.italic, rt.font.color.rgb = "Calibri", Pt(10.5), True, COLOR_DARK
 
-def add_image_figure(img_filename, caption_text, width_inches=5.8):
-    path = os.path.join(brain_dir, img_filename)
-    if os.path.exists(path):
-        p_img = doc.add_paragraph()
-        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_img.paragraph_format.space_before = Pt(12)
-        p_img.paragraph_format.space_after = Pt(4)
-        run_img = p_img.add_run()
-        run_img.add_picture(path, width=Inches(width_inches))
-        
-        p_cap = doc.add_paragraph()
-        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_cap.paragraph_format.space_after = Pt(12)
-        r_cap = p_cap.add_run(caption_text)
-        r_cap.font.name = 'Calibri'
-        r_cap.font.size = Pt(9.5)
-        r_cap.font.italic = True
-        r_cap.font.color.rgb = COLOR_GRAY
+def figure(filename, caption, width=5.8):
+    path = os.path.join(brain_dir, filename)
+    if not os.path.exists(path):
+        print(f"WARNING: missing figure {filename}")
+        return
+    pi = doc.add_paragraph()
+    pi.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    pi.paragraph_format.space_before, pi.paragraph_format.space_after = Pt(10), Pt(3)
+    pi.add_run().add_picture(path, width=Inches(width))
+    pc = doc.add_paragraph()
+    pc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    pc.paragraph_format.space_after = Pt(10)
+    rc = pc.add_run(caption)
+    rc.font.name, rc.font.size, rc.font.italic, rc.font.color.rgb = "Calibri", Pt(9.5), True, COLOR_GRAY
 
-# ==================== ENHANCED TITLE PAGE ====================
-p_top_badge = doc.add_paragraph()
-p_top_badge.alignment = WD_ALIGN_PARAGRAPH.CENTER
-r_badge = p_top_badge.add_run("◆ MEDICAL AI ENGINEERING SPRINT • WEEK 2 PROGRESS ◆")
-r_badge.font.name = 'Calibri'
-r_badge.font.size = Pt(10)
-r_badge.font.bold = True
-r_badge.font.color.rgb = COLOR_EMERALD
-p_top_badge.paragraph_format.space_before = Pt(10)
-p_top_badge.paragraph_format.space_after = Pt(20)
+# ═══════════════════════════════════════════════════════
+# TITLE PAGE
+# ═══════════════════════════════════════════════════════
+badge = doc.add_paragraph()
+badge.alignment = WD_ALIGN_PARAGRAPH.CENTER
+rb = badge.add_run("◆  MEDICAL AI ENGINEERING SPRINT  •  WEEK 2 PROGRESS  ◆")
+rb.font.name, rb.font.size, rb.font.bold, rb.font.color.rgb = "Calibri", Pt(10), True, COLOR_EMERALD
+badge.paragraph_format.space_before, badge.paragraph_format.space_after = Pt(10), Pt(18)
 
-p_title = doc.add_paragraph()
-p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-r_title = p_title.add_run("ShifaScribe")
-r_title.font.name = 'Calibri'
-r_title.font.size = Pt(36)
-r_title.font.bold = True
-r_title.font.color.rgb = COLOR_NAVY
-p_title.paragraph_format.space_after = Pt(4)
+pt = doc.add_paragraph()
+pt.alignment = WD_ALIGN_PARAGRAPH.CENTER
+rt = pt.add_run("ShifaScribe")
+rt.font.name, rt.font.size, rt.font.bold, rt.font.color.rgb = "Calibri", Pt(36), True, COLOR_NAVY
+pt.paragraph_format.space_after = Pt(4)
 
-p_sub = doc.add_paragraph()
-p_sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-r_sub = p_sub.add_run("AI Urdu Voice-to-Text Medical Scribe System")
-r_sub.font.name = 'Calibri'
-r_sub.font.size = Pt(18)
-r_sub.font.bold = True
-r_sub.font.color.rgb = COLOR_TEAL
-p_sub.paragraph_format.space_after = Pt(24)
+ps = doc.add_paragraph()
+ps.alignment = WD_ALIGN_PARAGRAPH.CENTER
+rs = ps.add_run("AI Urdu Voice-to-Text Medical Scribe System")
+rs.font.name, rs.font.size, rs.font.bold, rs.font.color.rgb = "Calibri", Pt(18), True, COLOR_TEAL
+ps.paragraph_format.space_after = Pt(22)
 
-p_div = doc.add_paragraph()
-p_div.alignment = WD_ALIGN_PARAGRAPH.CENTER
-r_div = p_div.add_run("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-r_div.font.color.rgb = COLOR_EMERALD
-r_div.font.bold = True
+pd = doc.add_paragraph()
+pd.alignment = WD_ALIGN_PARAGRAPH.CENTER
+pd.add_run("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━").font.color.rgb = COLOR_EMERALD
 
-p_rep = doc.add_paragraph()
-p_rep.alignment = WD_ALIGN_PARAGRAPH.CENTER
-r_rep = p_rep.add_run("WEEK 2 TECHNICAL IMPLEMENTATION & PROGRESS REPORT")
-r_rep.font.name = 'Calibri'
-r_rep.font.size = Pt(13)
-r_rep.font.bold = True
-r_rep.font.color.rgb = COLOR_NAVY
-p_rep.paragraph_format.space_before = Pt(18)
-p_rep.paragraph_format.space_after = Pt(32)
-
-t_card = doc.add_table(rows=6, cols=2)
-t_card.alignment = WD_TABLE_ALIGNMENT.CENTER
-t_card.autofit = False
+pr = doc.add_paragraph()
+pr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+rr = pr.add_run("WEEK 2 TECHNICAL IMPLEMENTATION & PROGRESS REPORT")
+rr.font.name, rr.font.size, rr.font.bold, rr.font.color.rgb = "Calibri", Pt(13), True, COLOR_NAVY
+pr.paragraph_format.space_before, pr.paragraph_format.space_after = Pt(16), Pt(28)
 
 card_data = [
     ("Prepared By (Lead Engineer):", "Abdul Rehman"),
-    ("Submitted To (Supervisor):", "Khubaib Ahmed"),
-    ("Project Name:", "ShifaScribe (Urdu Medical Speech AI)"),
-    ("Reporting Scope:", "Week 2 (Sprint 2: Days 6 to 10)"),
-    ("Verification Status:", "Days 6, 7 & 8 Tested & Verified (100% Passed)"),
-    ("Submission Date:", "August 12, 2026"),
+    ("Submitted To (Supervisor):",   "Khubaib Ahmed"),
+    ("Project Name:",                "ShifaScribe (Urdu Medical Speech AI)"),
+    ("Reporting Scope:",             "Week 2 (Sprint 2: Days 6 to 10)"),
+    ("Verification Status:",         "Days 6, 7, 8 & 9 — Tested & Verified (100% Passed)"),
+    ("Submission Date:",             "August 12, 2026"),
 ]
-
-for i, (label, val) in enumerate(card_data):
-    row = t_card.rows[i]
+tc = doc.add_table(rows=6, cols=2)
+tc.alignment = WD_TABLE_ALIGNMENT.CENTER
+for i, (lbl, val) in enumerate(card_data):
+    row = tc.rows[i]
     c1, c2 = row.cells[0], row.cells[1]
-    c1.width = Inches(2.6)
-    c2.width = Inches(3.7)
-    
+    c1.width, c2.width = Inches(2.6), Inches(3.7)
     if i % 2 == 0:
-        set_cell_background(c1, "F1F5F9")
-        set_cell_background(c2, "F1F5F9")
-        
-    p1 = c1.paragraphs[0]
-    r1 = p1.add_run(label)
-    r1.font.name = 'Calibri'
-    r1.font.size = Pt(10.5)
-    r1.font.bold = True
-    r1.font.color.rgb = COLOR_NAVY
-    
-    p2 = c2.paragraphs[0]
-    r2 = p2.add_run(val)
-    r2.font.name = 'Calibri'
-    r2.font.size = Pt(10.5)
-    r2.font.bold = (i in [0, 1])
-    r2.font.color.rgb = COLOR_EMERALD if (i in [0, 1]) else COLOR_DARK
+        set_bg(c1, "F1F5F9"); set_bg(c2, "F1F5F9")
+    r1 = c1.paragraphs[0].add_run(lbl)
+    r1.font.name, r1.font.size, r1.font.bold, r1.font.color.rgb = "Calibri", Pt(10.5), True, COLOR_NAVY
+    r2 = c2.paragraphs[0].add_run(val)
+    r2.font.name, r2.font.size, r2.font.color.rgb = "Calibri", Pt(10.5), COLOR_EMERALD if i < 2 else COLOR_DARK
+    r2.font.bold = i < 2
 
 doc.add_page_break()
 
-# ==================== EXECUTIVE SUMMARY ====================
-add_heading_1("Executive Summary")
-
-add_body(
-    "ShifaScribe is an AI-powered Urdu Voice-to-Text Medical Scribe System engineered specifically for high-throughput OPD (Outpatient Department) hospital clinics. Following Sprint 1 (which established the Next.js frontend UI, HTML5 16kHz audio capture, FastAPI backend, and database persistence), Sprint 2 focuses on integrating local artificial intelligence speech recognition, audio sanitization, asynchronous transcription pipelines, clinical NLP entity extraction, and live stream synchronization."
+# ═══════════════════════════════════════════════════════
+# EXECUTIVE SUMMARY
+# ═══════════════════════════════════════════════════════
+h1("Executive Summary")
+body("ShifaScribe is an AI-powered Urdu Voice-to-Text Medical Scribe System engineered for high-throughput OPD hospital clinics. Sprint 2 (Days 6–10) integrates local AI speech recognition, audio sanitization, asynchronous transcription pipelines, and live frontend stream synchronization.")
+callout(
+    "Days 6, 7, 8 & 9 are 100% complete and verified. Day 6: Local Whisper-Small model. Day 7: CUDA acceleration & Librosa audio sanitization. Day 8: FastAPI BackgroundTasks async pipeline & task polling. Day 9: Next.js frontend connected to the Whisper pipeline with dual-panel status UI.",
+    "Sprint 2 Status:"
 )
 
-add_callout(
-    "Week 2 Progress: Days 6, 7 & 8 are 100% complete and verified. Day 6 initialized local OpenAI Whisper-Small speech recognition. Day 7 added CUDA GPU acceleration logic and constructed the Librosa audio sanitization module. Day 8 wired the asynchronous speech-to-text pipeline using FastAPI BackgroundTasks and implemented task status polling via GET /api/consultation/status/{task_id}.",
-    "Sprint 2 Milestone Status:"
-)
+# ═══════════════════════════════════════════════════════
+# DAY 6
+# ═══════════════════════════════════════════════════════
+h1("Day 6 Implementation: Local OpenAI Whisper AI Integration")
 
-# ==================== DAY 6 IMPLEMENTATION ====================
-add_heading_1("Day 6 Implementation: Local OpenAI Whisper AI Integration")
+h2("AI Engine Architecture & Dependencies")
+body("The backend requirements were expanded with torch>=2.2.0, torchaudio>=2.2.0, and transformers>=4.38.0. A dedicated backend/ai/ package was created to encapsulate all AI inference modules.")
 
-add_heading_2("AI Engine Architecture & Dependencies")
-add_body(
-    "On Day 6, the Python backend was upgraded with deep learning speech recognition capabilities. The backend requirements (backend/requirements.txt) were expanded to include torch>=2.2.0, torchaudio>=2.2.0, and transformers>=4.38.0. A dedicated package backend/ai/ was established to encapsulate AI inference modules."
-)
+h2("WhisperTranscriber Service")
+body("backend/ai/whisper_service.py contains the WhisperTranscriber class. It initialises WhisperProcessor and WhisperForConditionalGeneration from the openai/whisper-small checkpoint, pads short audio clips to 30-second windows for full model accuracy, and processes longer recordings in 25-second-stride overlapping chunks.")
+figure("day6_whisper_code.png", "Figure 1: WhisperTranscriber implementation in backend/ai/whisper_service.py")
 
-add_heading_2("WhisperTranscriber Service Implementation")
-add_body(
-    "Inside backend/ai/whisper_service.py, a dedicated WhisperTranscriber class was constructed. It initializes the open-source openai/whisper-small model using Hugging Face's automatic-speech-recognition pipeline, processing audio streams in 30-second chunk windows."
-)
+h2("Model Initialisation & Verification")
+body("backend/test_whisper.py triggered the automatic download of model weights (~960 MB) into the local Hugging Face cache and confirmed pipeline readiness.")
+figure("day6_test_console.png", "Figure 2: Terminal output confirming openai/whisper-small model loaded successfully")
 
-add_image_figure("day6_whisper_code.png", "Figure 1: Code Implementation Screenshot of WhisperTranscriber in backend/ai/whisper_service.py")
+# ═══════════════════════════════════════════════════════
+# DAY 7
+# ═══════════════════════════════════════════════════════
+h1("Day 7 Implementation: CUDA Acceleration & Librosa Audio Sanitization")
 
-add_heading_2("Model Cache Initialization & Verification Test Output")
-add_body(
-    "A test verification script (backend/test_whisper.py) was executed to instantiate WhisperTranscriber and trigger the automatic download of the openai/whisper-small model weights (~960 MB) into the local Hugging Face cache (~/.cache/huggingface/hub). On execution, the test passed with 100% success."
-)
+h2("CUDA Hardware Acceleration")
+body("torch.cuda.is_available() dynamically routes inference to GPU device 0 (when available) or falls back to CPU. This ensures the same codebase runs on both development laptops and GPU-equipped production servers.")
 
-add_image_figure("day6_test_console.png", "Figure 2: Verified Terminal Output Screenshot showing OpenAI Whisper-Small Local Model Initialization & Pipeline Readiness ([SUCCESS] OpenAI Whisper-Small model loaded successfully!)")
+h2("Librosa Audio Noise & Silence Sanitization Module")
+body("backend/ai/audio_processor.py implements sanitize_audio(). The function: (1) converts WebM/Opus browser streams to 16kHz WAV via bundled imageio-ffmpeg, (2) trims silence and ambient room noise using librosa.effects.trim(top_db=30), and (3) saves a clean PCM_16 WAV to disk.")
+figure("day7_sanitizer_code.png", "Figure 3: sanitize_audio() in backend/ai/audio_processor.py with FFmpeg WebM conversion")
 
-# ==================== DAY 7 IMPLEMENTATION ====================
-add_heading_1("Day 7 Implementation: CUDA Acceleration & Librosa Audio Sanitization")
+h2("Sanitization Verification")
+body("A 5.0-second test audio containing leading/trailing silence was trimmed to 1.12 seconds — a 77.6% bandwidth and compute reduction.")
+figure("day7_sanitization_console.png", "Figure 4: Terminal output confirming Librosa sanitization: 5.0s → 1.12s (trimmed 3.88s)")
 
-add_heading_2("CUDA Hardware Acceleration Logic")
-add_body(
-    "On Day 7, the WhisperTranscriber service was upgraded with dynamic hardware detection using torch.cuda.is_available(). When a CUDA-compatible GPU (e.g. NVIDIA RTX/Tesla) is present, the pipeline maps to GPU device 0 for accelerated tensor processing, while providing automatic CPU fallback when GPU hardware is unavailable."
-)
+# ═══════════════════════════════════════════════════════
+# DAY 8
+# ═══════════════════════════════════════════════════════
+h1("Day 8 Implementation: Asynchronous Whisper Transcription Pipeline")
 
-add_heading_2("Librosa Audio Noise & Silence Sanitization Module")
-add_body(
-    "To prevent ambient hospital OPD clinic background noises (HVAC fan hum, footsteps, door clicks) and dead silence from degrading speech-to-text accuracy or wasting compute cycles, a dedicated sanitization module was constructed in backend/ai/audio_processor.py. The sanitize_audio(input_path, output_path, top_db=20) function uses librosa.load(sr=16000), applies librosa.effects.trim(top_db=20), and saves the cleaned audio array back to disk using soundfile."
-)
+h2("FastAPI BackgroundTasks & Non-Blocking Upload")
+body("POST /api/consultation/upload-audio was upgraded with FastAPI BackgroundTasks. On upload the endpoint immediately returns HTTP 202 Accepted with a UUID task_id, then enqueues process_transcription_task as a background worker — keeping the HTTP connection non-blocking.")
 
-add_image_figure("day7_sanitizer_code.png", "Figure 3: Code Implementation Screenshot of sanitize_audio in backend/ai/audio_processor.py")
+h2("Background Worker & Task Store")
+body("An in-memory task_store = {} dictionary tracks task state. The background worker: (1) sanitizes raw audio, (2) runs Whisper AI inference, and (3) updates task_store[task_id] with status='completed' and the transcribed text string.")
+figure("day8_pipeline_code.png", "Figure 5: BackgroundTasks, process_transcription_task, and polling endpoint in backend/main.py")
 
-add_heading_2("Sanitization Verification & Performance Metrics Test Output")
-add_body(
-    "A test script (backend/test_sanitization.py) was executed passing a 5.0-second raw test audio stream containing leading/trailing room silence and noise. The Librosa sanitization module successfully trimmed 3.88 seconds of silence/noise, yielding a clean 1.12-second audio file (77.6% bandwidth & processing reduction)."
-)
+h2("Status Polling Endpoint & Test Verification")
+body("GET /api/consultation/status/{task_id} returns the current processing state. The automated test script test_day8_pipeline.py verified the full flow: upload → HTTP 202 → poll processing → poll completed → receive Urdu text.")
+figure("day8_pipeline_console.png", "Figure 6: test_day8_pipeline.py output showing HTTP 202 upload, polling, and final transcription")
+figure("day8_swagger_pipeline_ui_1786526912039.jpg", "Figure 7: FastAPI Swagger UI (http://localhost:8000/docs) showing GET /status/{task_id} completed response")
 
-add_image_figure("day7_sanitization_console.png", "Figure 4: Verified Terminal Output Screenshot showing Librosa Audio Sanitization Test ([SUCCESS] Audio Sanitization Test Passed! Original: 5.0s, Sanitized: 1.12s, Trimmed: 3.88s)")
+# ═══════════════════════════════════════════════════════
+# DAY 9
+# ═══════════════════════════════════════════════════════
+h1("Day 9 Implementation: Frontend Live Transcription Stream Integration")
 
-# ==================== DAY 8 IMPLEMENTATION ====================
-add_heading_1("Day 8 Implementation: Asynchronous Whisper Transcription Pipeline")
+h2("Next.js → FastAPI Fetch Integration")
+body("ConsultationRecorder.tsx was updated so that when the MediaRecorder onstop event fires, the assembled WebM Blob is immediately packaged into a FormData object and posted via the fetch API to http://localhost:8000/api/consultation/upload-audio.")
 
-add_heading_2("FastAPI BackgroundTasks & Non-Blocking Audio Upload")
-add_body(
-    "On Day 8, the backend upload endpoint POST /api/consultation/upload-audio was upgraded to integrate FastAPI's BackgroundTasks framework. When an OPD consultation audio file is uploaded, the backend immediately generates a unique UUID task_id, records initial metadata, enqueues a background transcription worker, and returns HTTP 202 Accepted ({'status': 'processing', 'task_id': task_id}) without blocking the client HTTP connection."
-)
+h2("Task ID Extraction & 2-Second Polling Loop")
+body("The returned task_id is extracted and stored in a React ref. A setInterval polling loop runs every 2 seconds, querying GET /api/consultation/status/{task_id}. Polling stops automatically once status transitions to 'completed' or 'failed', preventing unnecessary background requests.")
+figure("day9_component_code.png", "Figure 8: uploadAndTranscribe() in ConsultationRecorder.tsx — FormData upload, task_id extraction, and setInterval polling")
 
-add_heading_2("Task Store Tracking & Background Worker Logic")
-add_body(
-    "An in-memory tracking dictionary task_store = {} was implemented alongside a dedicated background worker function process_transcription_task. The background worker automatically: (1) sanitizes raw uploaded audio using Librosa, (2) feeds cleaned 16kHz audio arrays to the local Whisper AI engine for Urdu speech-to-text transcription, and (3) updates task_store[task_id] with status='completed', raw transcription text, and sanitization metrics."
-)
+h2("Dual UI Status Display")
+body("A real-time status indicator panel renders four states below the recorder button: (1) Uploading Audio — blue animated dots, (2) Processing AI Transcription — amber spinner and indeterminate progress bar, (3) Transcription Complete — read-only textarea with Copy button showing the final Urdu text, (4) Failed — red error message with dismiss option. The bottom EHR panels synchronise with the same transcription state.")
+figure("day9_ui_uploading_1786531316219.jpg", "Figure 9: UI in 'Uploading Audio...' state — audio blob being sent to FastAPI Whisper pipeline")
+figure("day9_ui_completed_1786531342101.jpg", "Figure 10: UI in 'Transcription Complete' state — Urdu transcription displayed in read-only textarea with Copy button")
 
-add_image_figure("day8_pipeline_code.png", "Figure 5: Code Implementation Screenshot of BackgroundTasks & Whisper Pipeline in backend/main.py")
+h2("Transcription Quality Improvements (Day 9 Fix)")
+body("Whisper short-clip truncation was resolved by zero-padding all recordings shorter than 30 seconds to the full 480,000-sample Whisper window before building the log-mel spectrogram. Beam search was enabled (num_beams=5) and greedy temperature=0.0 set for more deterministic, higher-accuracy decoding. The silence trimming threshold was also raised from top_db=20 to top_db=30 to prevent quiet speech from being accidentally clipped.")
 
-add_heading_2("Status Polling Endpoint (GET /api/consultation/status/{task_id}) & Test Verification")
-add_body(
-    "A polling endpoint GET /api/consultation/status/{task_id} was implemented to allow frontend clients to query transcription progress. An automated test script (test_day8_pipeline.py) verified the complete workflow: uploading audio (HTTP 202), extracting task_id, polling status ('processing' -> 'completed'), and retrieving the final transcribed clinical text."
-)
+# ═══════════════════════════════════════════════════════
+# ROADMAP
+# ═══════════════════════════════════════════════════════
+h1("Roadmap for Day 10")
+h2("Day 10: Sprint 2 Final Integration & OPD Trial Simulation")
+body("[Pending: End-to-end OPD consultation workflow trial, ICD-10 NLP entity extraction, error handling hardening, and supervisor sign-off.]", italic=True)
 
-add_image_figure("day8_pipeline_console.png", "Figure 6: Verified Terminal Output Screenshot showing Async Upload (HTTP 202), Task ID Polling, and Final Transcribed Text Output")
-add_image_figure("day8_swagger_pipeline_ui_1786526912039.jpg", "Figure 7: Interactive FastAPI Swagger OpenAPI Polling UI (http://localhost:8000/docs) displaying GET /status/{task_id} Completed Response")
+# ═══════════════════════════════════════════════════════
+# SUPERVISOR EVALUATION
+# ═══════════════════════════════════════════════════════
+h1("Supervisor Evaluation, Remarks & Approval")
+body("This section is reserved for supervisor evaluation and formal sign-off for Week 2.")
 
-# ==================== SEQUENTIAL ROADMAP FOR DAYS 9 - 10 ====================
-add_heading_1("Sequential Roadmap for Days 9 to 10")
+te = doc.add_table(rows=5, cols=2)
+te.alignment = WD_TABLE_ALIGNMENT.CENTER
+hdr = te.rows[0].cells
+hdr[0].width, hdr[1].width = Inches(2.2), Inches(4.1)
+set_bg(hdr[0], "0F172A"); set_bg(hdr[1], "0F172A")
+rh0 = hdr[0].paragraphs[0].add_run("Evaluation Field")
+rh0.font.bold = True; rh0.font.color.rgb = RGBColor(255,255,255)
+rh1 = hdr[1].paragraphs[0].add_run("Supervisor Assessment & Details")
+rh1.font.bold = True; rh1.font.color.rgb = RGBColor(255,255,255)
 
-add_heading_2("Day 9 Roadmap: Frontend Live Transcription Stream Integration")
-add_body("[Pending Day 9 Implementation: Connecting the Next.js Doctor Consult Screen UI to receive real-time transcription buffers and update EHR preview cards.]", italic=True)
+rows_data = [
+    ("Overall Week 2 Rating:", "[   ] Excellent    [   ] Very Good    [   ] Satisfactory    [   ] Needs Revision"),
+    ("Supervisor Remarks:",    "(Please write remarks here...)\n\n\n\n"),
+    ("Supervisor Signature:",  "_________________________________________\nKhubaib Ahmed"),
+    ("Date of Sign-off:",      "Date: ______________, 2026   |   Status: [   ] APPROVED"),
+]
+for i, (lbl, val) in enumerate(rows_data, 1):
+    r = te.rows[i]
+    r.cells[0].width, r.cells[1].width = Inches(2.2), Inches(4.1)
+    rl = r.cells[0].paragraphs[0].add_run(lbl)
+    rl.font.bold = True
+    rv = r.cells[1].paragraphs[0].add_run(val)
+    if "remarks" in lbl.lower():
+        rv.font.italic = True; rv.font.color.rgb = COLOR_GRAY
 
-add_heading_2("Day 10 Roadmap: Sprint 2 Final Integration & OPD Trial Simulation")
-add_body("[Pending Day 10 Implementation: End-to-end OPD consultation workflow trial, error handling, performance benchmark, and supervisor sign-off.]", italic=True)
-
-# ==================== SUPERVISOR EVALUATION & REMARKS ====================
-add_heading_1("Supervisor Evaluation, Remarks & Approval")
-
-add_body(
-    "This section is reserved for supervisor evaluation, comments, and formal sign-off for the Week 2 Technical Progress of ShifaScribe."
-)
-
-t_eval = doc.add_table(rows=5, cols=2)
-t_eval.alignment = WD_TABLE_ALIGNMENT.CENTER
-t_eval.autofit = False
-
-hdr_cells = t_eval.rows[0].cells
-hdr_cells[0].width = Inches(2.2)
-hdr_cells[1].width = Inches(4.1)
-set_cell_background(hdr_cells[0], "0F172A")
-set_cell_background(hdr_cells[1], "0F172A")
-
-p_h0 = hdr_cells[0].paragraphs[0]
-r_h0 = p_h0.add_run("Evaluation Field")
-r_h0.font.bold = True
-r_h0.font.color.rgb = RGBColor(255, 255, 255)
-
-p_h1 = hdr_cells[1].paragraphs[0]
-r_h1 = p_h1.add_run("Supervisor Assessment & Details")
-r_h1.font.bold = True
-r_h1.font.color.rgb = RGBColor(255, 255, 255)
-
-# Row 1: Rating
-r1 = t_eval.rows[1]
-r1.cells[0].width = Inches(2.2)
-r1.cells[1].width = Inches(4.1)
-p_r1_lbl = r1.cells[0].paragraphs[0].add_run("Overall Week 2 Rating:")
-p_r1_lbl.font.bold = True
-p_r1_val = r1.cells[1].paragraphs[0].add_run("[   ] Excellent    [   ] Very Good    [   ] Satisfactory    [   ] Needs Revision")
-
-# Row 2: Remarks Box
-r2 = t_eval.rows[2]
-r2.cells[0].width = Inches(2.2)
-r2.cells[1].width = Inches(4.1)
-p_r2_lbl = r2.cells[0].paragraphs[0].add_run("Supervisor Remarks & Feedback:")
-p_r2_lbl.font.bold = True
-
-p_r2_val = r2.cells[1].paragraphs[0]
-p_r2_val.paragraph_format.space_after = Pt(40)
-r_rem = p_r2_val.add_run("(Please write supervisor remarks and evaluation notes here...)\n\n\n\n")
-r_rem.font.italic = True
-r_rem.font.color.rgb = COLOR_GRAY
-
-# Row 3: Signature
-r3 = t_eval.rows[3]
-r3.cells[0].width = Inches(2.2)
-r3.cells[1].width = Inches(4.1)
-p_r3_lbl = r3.cells[0].paragraphs[0].add_run("Supervisor Signature:")
-p_r3_lbl.font.bold = True
-p_r3_val = r3.cells[1].paragraphs[0].add_run("_________________________________________\nKhubaib Ahmed")
-
-# Row 4: Date & Approval
-r4 = t_eval.rows[4]
-r4.cells[0].width = Inches(2.2)
-r4.cells[1].width = Inches(4.1)
-p_r4_lbl = r4.cells[0].paragraphs[0].add_run("Date of Sign-off & Status:")
-p_r4_lbl.font.bold = True
-p_r4_val = r4.cells[1].paragraphs[0].add_run("Date: ______________, 2026   |   Status: [   ] APPROVED FOR NEXT PHASE")
-
-# Save Document safely
 try:
     doc.save(output_docx)
-    print("Successfully updated Week 2 Word report at:", output_docx)
+    print("Saved Week 2 Report to:", output_docx)
 except Exception:
-    alt_path = r"c:\Users\Sys\Desktop\my-startup-app\ShifaScribe_Week2_Report_v2.docx"
-    doc.save(alt_path)
-    print("Main file locked by Microsoft Word. Saved updated report to:", alt_path)
+    alt = r"c:\Users\Sys\Desktop\my-startup-app\ShifaScribe_Week2_Report_v3.docx"
+    doc.save(alt)
+    print("File locked — saved to:", alt)
