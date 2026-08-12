@@ -1,5 +1,6 @@
 import os
 import uuid
+import time
 import shutil
 from datetime import datetime
 from typing import Optional
@@ -19,7 +20,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="ShifaScribe AI Medical Scribe API",
     description="FastAPI Backend, Audio Processing & Local Whisper AI Engine",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 # CORS Middleware configuration
@@ -55,31 +56,59 @@ def get_transcriber_instance() -> WhisperTranscriber:
 
 def process_transcription_task(task_id: str, raw_file_path: str, consultation_id: Optional[int] = None):
     """
-    Background Task Worker:
+    Background Task Worker (Day 10 — Latency Tracked):
     1. Sanitizes raw audio input using Librosa (noise reduction & silence trimming).
-    2. Runs Whisper AI speech-to-text inference.
-    3. Updates task_store with the final transcribed text.
+    2. Runs Whisper AI speech-to-text inference (fp16 on GPU, float32 on CPU).
+    3. Tracks total elapsed time and logs PERFORMANCE metric to console.
+    4. Updates task_store with the final transcribed text and latency data.
     """
     global task_store
     print(f"[ShifaScribe Worker] Background transcription task started for task_id: {task_id}")
-    
+
     try:
-        # Step 1: Sanitize raw audio input (force .wav extension for soundfile format support)
+        # ── Step 1: Sanitize raw audio ─────────────────────────────────────
         base_name = os.path.splitext(os.path.basename(raw_file_path))[0]
         sanitized_file_path = os.path.join(STORAGE_DIR, f"sanitized_{base_name}.wav")
-        
-        sanitization_res = sanitize_audio(raw_file_path, sanitized_file_path, top_db=20)
-        
+
+        # Day 10: Start latency timer right before sanitization begins
+        start_time = time.time()
+
+        sanitization_res = sanitize_audio(raw_file_path, sanitized_file_path, top_db=30)
+        sanitization_elapsed = round(time.time() - start_time, 3)
+        print(f"⏱  [PERFORMANCE] Sanitization completed in {sanitization_elapsed:.3f}s")
+
         # Target audio path for Whisper AI (use sanitized WAV if available, else raw audio)
         target_audio_path = sanitized_file_path if os.path.exists(sanitized_file_path) else raw_file_path
 
-        # Step 2: Run Whisper AI speech-to-text inference
+        # ── Step 2: Run Whisper AI speech-to-text inference ────────────────
+        inference_start = time.time()
+
         ai_engine = get_transcriber_instance()
         transcription_res = ai_engine.transcribe_audio(target_audio_path, language="ur")
-        
+
+        inference_elapsed = round(time.time() - inference_start, 3)
+        print(f"⏱  [PERFORMANCE] Whisper inference completed in {inference_elapsed:.3f}s")
+
+        # ── Step 3: Calculate & log total pipeline latency ─────────────────
+        total_elapsed = round(time.time() - start_time, 3)
+        audio_duration = transcription_res.get("audio_duration_sec", 0)
+        rtf = round(total_elapsed / audio_duration, 3) if audio_duration > 0 else None
+        latency_status = "✅ WITHIN TARGET" if total_elapsed < 2.5 else "⚠️  EXCEEDS 2.5s TARGET"
+
+        print(f"")
+        print(f"🚀 [PERFORMANCE] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print(f"🚀 [PERFORMANCE] Transcription pipeline completed in {total_elapsed:.2f}s")
+        print(f"🚀 [PERFORMANCE]   • Sanitization  : {sanitization_elapsed:.3f}s")
+        print(f"🚀 [PERFORMANCE]   • Whisper AI    : {inference_elapsed:.3f}s")
+        print(f"🚀 [PERFORMANCE]   • Audio Duration: {audio_duration:.2f}s")
+        print(f"🚀 [PERFORMANCE]   • Real-Time Factor (RTF): {rtf}x" if rtf else "🚀 [PERFORMANCE]   • Real-Time Factor (RTF): N/A")
+        print(f"🚀 [PERFORMANCE]   • PRD Target    : < 2.5s  →  {latency_status}")
+        print(f"🚀 [PERFORMANCE] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print(f"")
+
         transcribed_text = transcription_res.get("text", "")
-        
-        # Step 3: Update task_store with completion status
+
+        # ── Step 4: Update task_store with completion status & metrics ─────
         task_store[task_id] = {
             "status": "completed",
             "task_id": task_id,
@@ -89,9 +118,18 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
             "sanitized_file_path": target_audio_path,
             "sanitization": sanitization_res,
             "transcription_metadata": transcription_res,
+            "performance": {
+                "total_elapsed_sec": total_elapsed,
+                "sanitization_elapsed_sec": sanitization_elapsed,
+                "inference_elapsed_sec": inference_elapsed,
+                "audio_duration_sec": audio_duration,
+                "real_time_factor": rtf,
+                "prd_target_sec": 2.5,
+                "within_prd_target": total_elapsed < 2.5,
+            },
             "completed_at": datetime.now().isoformat(),
         }
-        print(f"[ShifaScribe Worker] Task '{task_id}' completed successfully! Text length: {len(transcribed_text)}")
+        print(f"[ShifaScribe Worker] Task '{task_id}' completed. Text length: {len(transcribed_text)} chars.")
     except Exception as e:
         print(f"[ShifaScribe Worker] Task '{task_id}' failed: {e}")
         task_store[task_id] = {
@@ -115,8 +153,9 @@ def health_check():
     return {
         "status": "API is running",
         "service": "ShifaScribe Audio & AI Engine",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "ai_model": "openai/whisper-small",
+        "prd_latency_target_sec": 2.5,
     }
 
 # Day 8 Endpoint: Asynchronous Audio Upload with Background Whisper Task

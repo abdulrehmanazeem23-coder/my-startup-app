@@ -10,9 +10,12 @@ import numpy as np
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
 # Whisper processes audio in 30-second windows at 16kHz
-WHISPER_SAMPLE_RATE = 16000
-WHISPER_CHUNK_LENGTH = 30  # seconds
-WHISPER_N_SAMPLES = WHISPER_SAMPLE_RATE * WHISPER_CHUNK_LENGTH  # 480,000 samples
+WHISPER_SAMPLE_RATE  = 16000
+WHISPER_CHUNK_LENGTH = 30                                   # seconds
+WHISPER_N_SAMPLES    = WHISPER_SAMPLE_RATE * WHISPER_CHUNK_LENGTH  # 480,000 samples
+
+# Day 10: PRD latency target
+PRD_LATENCY_TARGET_SEC = 2.5
 
 class WhisperTranscriber:
     def __init__(self, model_name: str = "openai/whisper-small"):
@@ -34,8 +37,17 @@ class WhisperTranscriber:
         print(f"[ShifaScribe AI] Acceleration Hardware: {self.device_label}")
         
         try:
+            # Day 10: Load model in FP16 on CUDA for ~2x inference speedup;
+            # keep FP32 on CPU (FP16 is not supported on CPU in PyTorch)
+            self.torch_dtype = torch.float16 if self.is_cuda_available else torch.float32
+            dtype_label = "float16 (FP16 — half precision)" if self.is_cuda_available else "float32 (FP32 — CPU fallback)"
+            print(f"[ShifaScribe AI] Precision Mode  : {dtype_label}")
+
             self.processor = WhisperProcessor.from_pretrained(self.model_name)
-            self.model = WhisperForConditionalGeneration.from_pretrained(self.model_name)
+            self.model = WhisperForConditionalGeneration.from_pretrained(
+                self.model_name,
+                torch_dtype=self.torch_dtype,   # FP16 on GPU, FP32 on CPU
+            )
             
             if self.is_cuda_available:
                 self.model = self.model.to("cuda")
@@ -100,8 +112,11 @@ class WhisperTranscriber:
                     return_tensors="pt"
                 ).input_features
 
+                # Day 10: Cast features to FP16 on CUDA for faster matrix ops
                 if self.is_cuda_available:
-                    input_features = input_features.to("cuda")
+                    input_features = input_features.to("cuda", dtype=torch.float16)
+                else:
+                    input_features = input_features.to(dtype=torch.float32)
 
                 # Force language & transcription task decoder tokens
                 forced_decoder_ids = self.processor.get_decoder_prompt_ids(
