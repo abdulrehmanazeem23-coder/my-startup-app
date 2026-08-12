@@ -3,13 +3,23 @@
 import { useState, useEffect, useRef } from "react";
 
 export type RecordingState = "idle" | "recording" | "processing";
+export type TranscriptionStatus =
+  | "idle"
+  | "uploading"
+  | "processing_ai"
+  | "completed"
+  | "failed";
 
 interface ConsultationRecorderProps {
   onStateChange?: (state: RecordingState) => void;
+  onTranscriptionUpdate?: (status: TranscriptionStatus, text: string) => void;
 }
+
+const BACKEND_URL = "http://localhost:8000";
 
 export default function ConsultationRecorder({
   onStateChange,
+  onTranscriptionUpdate,
 }: ConsultationRecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [seconds, setSeconds] = useState(0);
@@ -18,10 +28,18 @@ export default function ConsultationRecorder({
   const [audioMimeType, setAudioMimeType] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Day 9: Transcription state
+  const [transcriptionStatus, setTranscriptionStatus] =
+    useState<TranscriptionStatus>("idle");
+  const [transcriptionText, setTranscriptionText] = useState<string>("");
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string>("");
+
   // Audio capture refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Timer effect when recording
   useEffect(() => {
@@ -36,6 +54,15 @@ export default function ConsultationRecorder({
     return () => clearInterval(interval);
   }, [recordingState]);
 
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
+
   const updateState = (newState: RecordingState) => {
     setRecordingState(newState);
     if (onStateChange) {
@@ -43,14 +70,126 @@ export default function ConsultationRecorder({
     }
   };
 
-  // Start MediaRecorder & Compressed Microphone Capture (Day 3 Update)
+  const updateTranscription = (status: TranscriptionStatus, text: string) => {
+    setTranscriptionStatus(status);
+    setTranscriptionText(text);
+    if (onTranscriptionUpdate) {
+      onTranscriptionUpdate(status, text);
+    }
+  };
+
+  // Day 9: Upload blob to FastAPI and start polling
+  const uploadAndTranscribe = async (blob: Blob, mimeType: string) => {
+    updateTranscription("uploading", "");
+    setUploadProgress("Uploading audio to ShifaScribe AI...");
+
+    try {
+      const formData = new FormData();
+      const extension = mimeType.includes("webm")
+        ? ".webm"
+        : mimeType.includes("ogg")
+        ? ".ogg"
+        : mimeType.includes("mp4")
+        ? ".mp4"
+        : ".webm";
+      formData.append("file", blob, `opd_recording${extension}`);
+      formData.append("patient_id", "104");
+      formData.append("doctor_id", "4");
+
+      console.log(
+        `[ShifaScribe Day 9] Uploading ${(blob.size / 1024).toFixed(1)} KB audio blob to FastAPI...`
+      );
+
+      const uploadRes = await fetch(
+        `${BACKEND_URL}/api/consultation/upload-audio`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!uploadRes.ok) {
+        throw new Error(`Upload failed with HTTP ${uploadRes.status}`);
+      }
+
+      const uploadData = await uploadRes.json();
+      const returnedTaskId: string = uploadData.task_id;
+
+      console.log(
+        `[ShifaScribe Day 9] Upload successful. Task ID: ${returnedTaskId}`
+      );
+      setTaskId(returnedTaskId);
+      setUploadProgress("Audio uploaded! Starting AI transcription...");
+      updateTranscription("processing_ai", "");
+
+      // Start polling every 2 seconds
+      let pollCount = 0;
+      pollingIntervalRef.current = setInterval(async () => {
+        pollCount++;
+        console.log(
+          `[ShifaScribe Day 9] Polling status (attempt #${pollCount}) for task ${returnedTaskId}...`
+        );
+
+        try {
+          const statusRes = await fetch(
+            `${BACKEND_URL}/api/consultation/status/${returnedTaskId}`
+          );
+          const statusData = await statusRes.json();
+          const currentStatus = statusData.status;
+
+          console.log(
+            `[ShifaScribe Day 9] Poll #${pollCount} -> status: ${currentStatus}`
+          );
+
+          if (currentStatus === "completed") {
+            clearInterval(pollingIntervalRef.current!);
+            pollingIntervalRef.current = null;
+            const finalText = statusData.text || "(No text returned)";
+            updateTranscription("completed", finalText);
+            setUploadProgress("");
+            console.log(
+              `[ShifaScribe Day 9] Transcription complete: "${finalText}"`
+            );
+          } else if (currentStatus === "failed") {
+            clearInterval(pollingIntervalRef.current!);
+            pollingIntervalRef.current = null;
+            updateTranscription(
+              "failed",
+              statusData.error || "Transcription failed."
+            );
+            setUploadProgress("");
+          } else if (pollCount >= 60) {
+            // Timeout after 2 minutes
+            clearInterval(pollingIntervalRef.current!);
+            pollingIntervalRef.current = null;
+            updateTranscription("failed", "Transcription timed out after 2 minutes.");
+            setUploadProgress("");
+          }
+        } catch (pollErr) {
+          console.error(
+            `[ShifaScribe Day 9] Polling error on attempt #${pollCount}:`,
+            pollErr
+          );
+        }
+      }, 2000);
+    } catch (err: any) {
+      console.error("[ShifaScribe Day 9] Upload/transcription error:", err);
+      updateTranscription("failed", err.message || "Upload failed.");
+      setUploadProgress("");
+    }
+  };
+
+  // Start MediaRecorder & Compressed Microphone Capture
   const startRecording = async () => {
     setErrorMessage(null);
     audioChunksRef.current = [];
+    updateTranscription("idle", "");
+    setTaskId(null);
 
-    console.log("[ShifaScribe Compression] Requesting microphone access with 16kHz Mono constraints...");
+    console.log(
+      "[ShifaScribe Compression] Requesting microphone access with 16kHz Mono constraints..."
+    );
 
-    // Day 3 Audio Constraints: 16kHz Sample Rate, 1 Channel (Mono), Noise Suppression
     const audioConstraints: MediaStreamConstraints = {
       audio: {
         sampleRate: 16000,
@@ -64,9 +203,10 @@ export default function ConsultationRecorder({
     try {
       const stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
       streamRef.current = stream;
-      console.log("[ShifaScribe Compression] Microphone permission granted! Applied constraints: 16kHz sample rate, 1 (Mono) channel.");
+      console.log(
+        "[ShifaScribe Compression] Microphone permission granted! Applied constraints: 16kHz sample rate, 1 (Mono) channel."
+      );
 
-      // Day 3 WebM MIME Type Detection & Fallback
       const preferredMimeTypes = [
         "audio/webm;codecs=opus",
         "audio/webm",
@@ -77,7 +217,9 @@ export default function ConsultationRecorder({
       const selectedMimeType =
         preferredMimeTypes.find((type) => MediaRecorder.isTypeSupported(type)) || "";
 
-      console.log(`[ShifaScribe Compression] Selected browser MIME type: ${selectedMimeType}`);
+      console.log(
+        `[ShifaScribe Compression] Selected browser MIME type: ${selectedMimeType}`
+      );
 
       const options = selectedMimeType ? { mimeType: selectedMimeType } : undefined;
       const mediaRecorder = new MediaRecorder(stream, options);
@@ -106,26 +248,27 @@ export default function ConsultationRecorder({
         setAudioBlobSizeKB(sizeInKB);
         setAudioMimeType(blob.type || finalBlobType);
 
-        // Day 4 Verification Console Log
         console.log(
-          `[ShifaScribe Compression Success] Final Compressed Blob Generated:\n` +
-          `  • Size: ${sizeInKB} KB (${blob.size} bytes)\n` +
-          `  • MIME Type: ${blob.type || finalBlobType}\n` +
-          `  • Object URL: ${url}`
+          `[ShifaScribe Compression Success] Final Blob: ${sizeInKB} KB • ${blob.type || finalBlobType}`
         );
 
         // Stop all stream tracks to release microphone hardware
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => {
             track.stop();
-            console.log(`[ShifaScribe Compression] Released audio track: ${track.label}`);
+            console.log(
+              `[ShifaScribe Compression] Released audio track: ${track.label}`
+            );
           });
           streamRef.current = null;
         }
 
+        // Day 9: Immediately upload to FastAPI Whisper pipeline
+        uploadAndTranscribe(blob, blob.type || finalBlobType);
+
         setTimeout(() => {
           updateState("idle");
-        }, 1200);
+        }, 600);
       };
 
       // Start recording with 1000ms chunk interval
@@ -174,6 +317,37 @@ export default function ConsultationRecorder({
       .padStart(2, "0")}`;
   };
 
+  // Transcription status indicator config
+  const statusConfig = {
+    idle: { color: "slate", label: "", icon: null },
+    uploading: {
+      color: "blue",
+      label: "Uploading Audio...",
+      icon: "⬆️",
+      animate: true,
+    },
+    processing_ai: {
+      color: "amber",
+      label: "Processing AI Transcription...",
+      icon: "🤖",
+      animate: true,
+    },
+    completed: {
+      color: "emerald",
+      label: "Transcription Complete",
+      icon: "✅",
+      animate: false,
+    },
+    failed: {
+      color: "red",
+      label: "Transcription Failed",
+      icon: "❌",
+      animate: false,
+    },
+  };
+
+  const currentStatusConfig = statusConfig[transcriptionStatus];
+
   return (
     <div className="w-full max-w-xl mx-auto flex flex-col items-center justify-center p-8 bg-slate-900/80 rounded-3xl border border-slate-800 shadow-2xl backdrop-blur-xl transition-all duration-300">
       {/* Header Badge */}
@@ -185,7 +359,7 @@ export default function ConsultationRecorder({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {recordingState === "idle" && (
+          {recordingState === "idle" && transcriptionStatus === "idle" && (
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-950/80 text-emerald-400 border border-emerald-800/50">
               ● Ready (Compressed)
             </span>
@@ -197,7 +371,7 @@ export default function ConsultationRecorder({
           )}
           {recordingState === "processing" && (
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-950/90 text-amber-400 border border-amber-800/60">
-              ● WebM Compression
+              ● Packaging Audio
             </span>
           )}
         </div>
@@ -259,31 +433,48 @@ export default function ConsultationRecorder({
               </div>
               <span className="text-2xl font-extrabold font-mono">{formatTime(seconds)}</span>
               <span className="text-xs font-semibold uppercase text-red-100 mt-1">
-                Stop & Compress
+                Stop & Send to AI
               </span>
             </div>
           )}
 
           {recordingState === "processing" && (
             <div className="flex flex-col items-center justify-center text-center p-2">
-              <svg className="w-12 h-12 mb-2 animate-spin text-amber-100" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              <svg
+                className="w-12 h-12 mb-2 animate-spin text-amber-100"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
               </svg>
-              <span className="text-xs font-bold uppercase text-amber-100">Compressing Audio</span>
+              <span className="text-xs font-bold uppercase text-amber-100">
+                Packaging Audio
+              </span>
             </div>
           )}
         </button>
       </div>
 
-      {/* Local HTML5 Audio Voice Playback Player Card */}
+      {/* Local HTML5 Audio Playback Card */}
       {audioUrl && (
-        <div className="w-full mt-6 p-4 bg-slate-950/90 border border-teal-500/40 rounded-2xl flex flex-col gap-3 shadow-lg">
+        <div className="w-full mt-4 p-4 bg-slate-950/90 border border-teal-500/40 rounded-2xl flex flex-col gap-3 shadow-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse" />
               <span className="text-xs font-bold text-teal-300 uppercase tracking-wider">
-                Compressed Audio Playback (Day 3 Verified)
+                Captured Audio Playback
               </span>
             </div>
             <div className="flex items-center gap-2 font-mono text-[11px]">
@@ -310,6 +501,174 @@ export default function ConsultationRecorder({
           <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
             <span>Constraints: 16kHz • Mono Channel</span>
             <span className="text-teal-400 font-medium">Bandwidth Optimized</span>
+          </div>
+        </div>
+      )}
+
+      {/* Day 9: Real-Time Transcription Status Indicator */}
+      {transcriptionStatus !== "idle" && (
+        <div className="w-full mt-4 rounded-2xl overflow-hidden border border-slate-700/60 shadow-lg">
+          {/* Status Header Bar */}
+          <div
+            className={`flex items-center justify-between px-4 py-3 ${
+              transcriptionStatus === "uploading"
+                ? "bg-blue-950/80 border-b border-blue-800/60"
+                : transcriptionStatus === "processing_ai"
+                ? "bg-amber-950/80 border-b border-amber-800/60"
+                : transcriptionStatus === "completed"
+                ? "bg-emerald-950/80 border-b border-emerald-800/60"
+                : "bg-red-950/80 border-b border-red-800/60"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {(transcriptionStatus === "uploading" ||
+                transcriptionStatus === "processing_ai") && (
+                <svg
+                  className={`w-4 h-4 animate-spin ${
+                    transcriptionStatus === "uploading"
+                      ? "text-blue-400"
+                      : "text-amber-400"
+                  }`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              )}
+              <span
+                className={`text-xs font-bold uppercase tracking-wider ${
+                  transcriptionStatus === "uploading"
+                    ? "text-blue-300"
+                    : transcriptionStatus === "processing_ai"
+                    ? "text-amber-300"
+                    : transcriptionStatus === "completed"
+                    ? "text-emerald-300"
+                    : "text-red-300"
+                }`}
+              >
+                {currentStatusConfig.icon} {currentStatusConfig.label}
+              </span>
+            </div>
+            {taskId && (
+              <span className="text-[10px] font-mono text-slate-500 truncate max-w-[140px]">
+                {taskId.slice(0, 8)}…
+              </span>
+            )}
+          </div>
+
+          {/* Status Body */}
+          <div className="bg-slate-950/90 p-4">
+            {/* Uploading State */}
+            {transcriptionStatus === "uploading" && (
+              <div className="flex items-center gap-3">
+                <div className="flex gap-1">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className="w-2 h-2 rounded-full bg-blue-400"
+                      style={{
+                        animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+                      }}
+                    />
+                  ))}
+                </div>
+                <p className="text-sm text-blue-300">{uploadProgress}</p>
+              </div>
+            )}
+
+            {/* Processing AI State */}
+            {transcriptionStatus === "processing_ai" && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-1">
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        className="w-2 h-2 rounded-full bg-amber-400"
+                        style={{
+                          animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm text-amber-300">
+                    Whisper AI is analysing audio stream in Urdu...
+                  </p>
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-amber-500 to-orange-400 rounded-full"
+                    style={{
+                      animation: "progress-indeterminate 1.8s ease-in-out infinite",
+                      width: "60%",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Completed State: Transcription Output Textbox */}
+            {transcriptionStatus === "completed" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-emerald-400 font-semibold uppercase tracking-wider">
+                    Urdu Transcription Output (Raw)
+                  </span>
+                  <button
+                    onClick={() =>
+                      navigator.clipboard.writeText(transcriptionText)
+                    }
+                    className="text-[10px] px-2 py-1 rounded bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200 border border-slate-700 transition-colors"
+                    title="Copy to clipboard"
+                  >
+                    📋 Copy
+                  </button>
+                </div>
+                <textarea
+                  id="transcription-output"
+                  readOnly
+                  value={transcriptionText}
+                  rows={4}
+                  dir="auto"
+                  className="w-full bg-slate-900 border border-emerald-800/50 rounded-xl p-3 text-sm text-slate-100 resize-none font-sans leading-relaxed focus:outline-none focus:ring-2 focus:ring-emerald-600/50"
+                  placeholder="Transcribed text will appear here..."
+                />
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                  <span>Model: openai/whisper-small • Language: Urdu</span>
+                  <span className="text-emerald-400 font-medium">
+                    {transcriptionText.length} chars
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Failed State */}
+            {transcriptionStatus === "failed" && (
+              <div className="space-y-2">
+                <p className="text-sm text-red-300">{transcriptionText}</p>
+                <button
+                  onClick={() => {
+                    updateTranscription("idle", "");
+                    setTaskId(null);
+                  }}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-red-950 border border-red-800 text-red-300 hover:bg-red-900 transition-colors"
+                >
+                  Dismiss & Try Again
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

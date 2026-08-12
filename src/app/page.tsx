@@ -1,10 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import ConsultationRecorder, { RecordingState } from "@/components/ConsultationRecorder";
+import ConsultationRecorder, {
+  RecordingState,
+  TranscriptionStatus,
+} from "@/components/ConsultationRecorder";
 
 export default function DoctorConsultScreen() {
-  const [currentRecordingState, setCurrentRecordingState] = useState<RecordingState>("idle");
+  const [currentRecordingState, setCurrentRecordingState] =
+    useState<RecordingState>("idle");
+  const [transcriptionStatus, setTranscriptionStatus] =
+    useState<TranscriptionStatus>("idle");
+  const [transcriptionText, setTranscriptionText] = useState<string>("");
+
+  const handleTranscriptionUpdate = (
+    status: TranscriptionStatus,
+    text: string
+  ) => {
+    setTranscriptionStatus(status);
+    setTranscriptionText(text);
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100">
@@ -22,7 +37,7 @@ export default function DoctorConsultScreen() {
                   ShifaScribe
                 </h1>
                 <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                  v0.1-Day1
+                  v0.2-Day9
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -39,7 +54,9 @@ export default function DoctorConsultScreen() {
             </div>
             <div className="px-3.5 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
               <span className="text-slate-400 block text-[10px]">Consultant Doctor</span>
-              <span className="font-semibold text-slate-200">Dr. Arsam Khan (General Physician)</span>
+              <span className="font-semibold text-slate-200">
+                Dr. Arsam Khan (General Physician)
+              </span>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-800/40 text-xs text-emerald-400 font-medium">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -70,7 +87,10 @@ export default function DoctorConsultScreen() {
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                Chief Complaint: <span className="text-slate-300">Chest tightness & persistent cough for 3 days</span>
+                Chief Complaint:{" "}
+                <span className="text-slate-300">
+                  Chest tightness &amp; persistent cough for 3 days
+                </span>
               </p>
             </div>
           </div>
@@ -83,14 +103,17 @@ export default function DoctorConsultScreen() {
           </div>
         </section>
 
-        {/* Center Panel: Prominent Standalone Recorder Component */}
+        {/* Center Panel: Recorder Component with integrated Transcription UI */}
         <section className="my-4 flex flex-col items-center justify-center">
-          <ConsultationRecorder onStateChange={setCurrentRecordingState} />
+          <ConsultationRecorder
+            onStateChange={setCurrentRecordingState}
+            onTranscriptionUpdate={handleTranscriptionUpdate}
+          />
         </section>
 
         {/* Bottom EHR Transcription & Structure Preview Grid */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
-          {/* Live Urdu Audio Transcript Placeholder Card */}
+          {/* Live Urdu Audio Transcript Panel */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-lg">
             <div>
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
@@ -98,31 +121,67 @@ export default function DoctorConsultScreen() {
                   <span className="w-2.5 h-2.5 rounded-full bg-teal-400" />
                   Urdu Voice Transcription Stream
                 </h3>
-                <span className="text-xs text-slate-500 font-mono">Live Buffer</span>
+                <span
+                  className={`text-xs font-mono px-2 py-0.5 rounded border ${
+                    transcriptionStatus === "completed"
+                      ? "text-emerald-400 bg-emerald-950/60 border-emerald-800/50"
+                      : transcriptionStatus === "processing_ai" ||
+                        transcriptionStatus === "uploading"
+                      ? "text-amber-400 bg-amber-950/60 border-amber-800/50"
+                      : transcriptionStatus === "failed"
+                      ? "text-red-400 bg-red-950/60 border-red-800/50"
+                      : "text-slate-500 bg-slate-900 border-slate-800"
+                  }`}
+                >
+                  {transcriptionStatus === "idle"
+                    ? "Awaiting Input"
+                    : transcriptionStatus === "uploading"
+                    ? "Uploading..."
+                    : transcriptionStatus === "processing_ai"
+                    ? "AI Processing..."
+                    : transcriptionStatus === "completed"
+                    ? "Completed ✓"
+                    : "Failed ✗"}
+                </span>
               </div>
 
               <div className="mt-4 min-h-[140px] flex flex-col justify-center">
-                {currentRecordingState === "idle" && (
+                {transcriptionStatus === "idle" && (
                   <p className="text-sm text-slate-500 italic text-center">
-                    Click "Start Consultation" above to begin recording the patient conversation.
+                    Click &ldquo;Start Consultation&rdquo; above to record and
+                    auto-transcribe the patient conversation.
                   </p>
                 )}
-                {currentRecordingState === "recording" && (
+                {(transcriptionStatus === "uploading" ||
+                  transcriptionStatus === "processing_ai") && (
+                  <div className="flex flex-col items-center justify-center py-6 gap-3">
+                    <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs text-amber-400 font-medium text-center">
+                      {transcriptionStatus === "uploading"
+                        ? "Uploading audio to Whisper AI pipeline..."
+                        : "Whisper AI is processing Urdu speech..."}
+                    </p>
+                  </div>
+                )}
+                {transcriptionStatus === "completed" && (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-xs text-red-400 font-medium">
-                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                      Listening to OPD audio stream in Urdu...
+                    <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      Transcription Received
                     </div>
-                    <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800/80 text-sm text-slate-300 dir-rtl text-right font-sans">
-                      "مریض نے بتایا کہ تین دن سے سینے میں جکڑن ہے اور کھانسی آ رہی ہے۔"
+                    <div className="p-3 bg-slate-950/80 rounded-xl border border-emerald-800/40 text-sm text-slate-100 dir-auto text-right font-sans leading-relaxed min-h-[80px]">
+                      {transcriptionText || "(Empty transcript)"}
                     </div>
                   </div>
                 )}
-                {currentRecordingState === "processing" && (
-                  <div className="flex flex-col items-center justify-center py-6 gap-2">
-                    <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                    <p className="text-xs text-amber-400 font-medium">
-                      Translating & Segmenting Speech to EHR JSON...
+                {transcriptionStatus === "failed" && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-red-400 font-medium">
+                      <span className="w-2 h-2 rounded-full bg-red-500" />
+                      Transcription Error
+                    </div>
+                    <p className="text-xs text-red-300 p-3 bg-red-950/40 rounded-xl border border-red-900/40">
+                      {transcriptionText}
                     </p>
                   </div>
                 )}
@@ -144,33 +203,66 @@ export default function DoctorConsultScreen() {
                   Structured Medical EHR Output
                 </h3>
                 <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400">
-                  Preview
+                  {transcriptionStatus === "completed" ? "Ready" : "Preview"}
                 </span>
               </div>
 
               <div className="mt-4 space-y-3 min-h-[140px] text-xs">
-                <div className="p-2.5 bg-slate-950/50 rounded-lg border border-slate-800/60">
-                  <span className="font-semibold text-teal-400 block mb-0.5">
-                    Symptoms (علامات):
-                  </span>
-                  <span className="text-slate-300">
-                    Chest Tightness (سینے میں جکڑن), Cough (کھانسی) x 3 days
-                  </span>
-                </div>
-                <div className="p-2.5 bg-slate-950/50 rounded-lg border border-slate-800/60">
-                  <span className="font-semibold text-teal-400 block mb-0.5">
-                    Provisional Assessment:
-                  </span>
-                  <span className="text-slate-300">
-                    Upper Respiratory Tract Infection / Bronchitis evaluation
-                  </span>
-                </div>
+                {transcriptionStatus === "completed" && transcriptionText ? (
+                  <>
+                    <div className="p-2.5 bg-slate-950/50 rounded-lg border border-teal-800/40">
+                      <span className="font-semibold text-teal-400 block mb-0.5">
+                        Raw AI Transcript (Urdu):
+                      </span>
+                      <span className="text-slate-300 dir-auto block text-right">
+                        {transcriptionText}
+                      </span>
+                    </div>
+                    <div className="p-2.5 bg-slate-950/50 rounded-lg border border-slate-800/60">
+                      <span className="font-semibold text-teal-400 block mb-0.5">
+                        Provisional Assessment:
+                      </span>
+                      <span className="text-slate-300">
+                        Pending NLP ICD-10 extraction (Day 10)
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-2.5 bg-slate-950/50 rounded-lg border border-slate-800/60">
+                      <span className="font-semibold text-teal-400 block mb-0.5">
+                        Symptoms (علامات):
+                      </span>
+                      <span className="text-slate-300">
+                        Chest Tightness (سینے میں جکڑن), Cough (کھانسی) x 3 days
+                      </span>
+                    </div>
+                    <div className="p-2.5 bg-slate-950/50 rounded-lg border border-slate-800/60">
+                      <span className="font-semibold text-teal-400 block mb-0.5">
+                        Provisional Assessment:
+                      </span>
+                      <span className="text-slate-300">
+                        Upper Respiratory Tract Infection / Bronchitis evaluation
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="pt-3 border-t border-slate-800/60 flex items-center justify-between text-xs text-slate-500">
               <span>Schema: ICD-10 Standard</span>
-              <span className="text-emerald-400 font-medium">Ready for EHR Sync</span>
+              <span
+                className={
+                  transcriptionStatus === "completed"
+                    ? "text-emerald-400 font-medium"
+                    : "text-slate-500"
+                }
+              >
+                {transcriptionStatus === "completed"
+                  ? "Ready for EHR Sync"
+                  : "Awaiting Transcription"}
+              </span>
             </div>
           </div>
         </section>
@@ -178,7 +270,7 @@ export default function DoctorConsultScreen() {
 
       {/* Doctor Consult Screen Footer */}
       <footer className="border-t border-slate-800/80 bg-slate-900/40 py-3 px-6 text-center text-xs text-slate-500">
-        ShifaScribe OPD Scribe System • Day 1 Workspace Initialized • Built for High-Efficiency OPD Clinics
+        ShifaScribe OPD Scribe System • Day 9: Frontend ↔ Whisper AI Pipeline Connected • Sprint 2
       </footer>
     </div>
   );

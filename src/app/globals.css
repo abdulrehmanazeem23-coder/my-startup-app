@@ -40,3 +40,14 @@
 .waveform-bar-3 { animation: waveform-bar 0.7s ease-in-out infinite 0.4s; }
 .waveform-bar-4 { animation: waveform-bar 1.3s ease-in-out infinite 0.1s; }
 .waveform-bar-5 { animation: waveform-bar 0.9s ease-in-out infinite 0.3s; }
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(-6px); opacity: 0.6; }
+}
+
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-100%); width: 60%; }
+  50% { transform: translateX(60%); width: 60%; }
+  100% { transform: translateX(200%); width: 60%; }
+}
