@@ -37,201 +37,95 @@ def shell_frame(width, height, title, title_col=SLATE):
     draw.rectangle([0, 0, width-1, height-1], outline=BORDER, width=1)
     for i, c in enumerate([(220,50,47),(230,180,0),(50,205,50)]):
         draw.ellipse([12+i*20, 10, 24+i*20, 22], fill=c)
-    draw.text((width//2 - 100, 10), title, fill=title_col, font=FONT_REG)
+    draw.text((width//2 - 120, 10), title, fill=title_col, font=FONT_REG)
     return img, draw
 
-def txt(draw, x, y, text, col=WHITE, font=None):
-    draw.text((x, y), text, fill=col, font=font or FONT_MONO)
-    return y + 18
-
 # ─────────────────────────────────────────────────────────────────────────────
-# Figure A: Day 10 main.py code — latency timer implementation (REAL CODE)
+# Day 11 Figure 1: backend/nlp/regex_mapper.py Code
 # ─────────────────────────────────────────────────────────────────────────────
-def fig_day10_code():
-    img, draw = shell_frame(920, 440, "backend/main.py  —  process_transcription_task()  [Day 10]")
+def fig_day11_regex_code():
+    img, draw = shell_frame(920, 480, "backend/nlp/regex_mapper.py  —  RegEx & Lookup Engine  [Day 11]")
     lines = [
-        ("1 ", SLATE, "import time  # Day 10: latency tracking"),
-        ("2 ", SLATE, ""),
-        ("3 ", SLATE, "def process_transcription_task(task_id, raw_file_path, consultation_id=None):"),
-        ("4 ", SLATE, "    # ── Step 1: Sanitize ────────────────────────────────────────────"),
-        ("5 ", SLATE, "    base_name = os.path.splitext(os.path.basename(raw_file_path))[0]"),
-        ("6 ", SLATE, "    sanitized_file_path = os.path.join(STORAGE_DIR, f'sanitized_{base_name}.wav')"),
-        ("7 ", SLATE, ""),
-        ("8 ", SLATE, "    start_time = time.time()   # <── Day 10: timer starts here"),
-        ("9 ", SLATE, ""),
-        ("10", SLATE, "    sanitization_res = sanitize_audio(raw_file_path, sanitized_file_path, top_db=30)"),
-        ("11", SLATE, "    sanitization_elapsed = round(time.time() - start_time, 3)"),
-        ("12", SLATE, "    print(f'[PERF] Sanitization completed in {sanitization_elapsed:.3f}s')"),
-        ("13", SLATE, ""),
-        ("14", SLATE, "    # ── Step 2: Whisper AI Inference ─────────────────────────────────"),
-        ("15", SLATE, "    inference_start = time.time()"),
-        ("16", SLATE, "    ai_engine = get_transcriber_instance()"),
-        ("17", SLATE, "    transcription_res = ai_engine.transcribe_audio(target_audio_path, language='ur')"),
-        ("18", SLATE, "    inference_elapsed = round(time.time() - inference_start, 3)"),
-        ("19", SLATE, "    print(f'[PERF] Whisper inference completed in {inference_elapsed:.3f}s')"),
-        ("20", SLATE, ""),
-        ("21", SLATE, "    # ── Step 3: Calculate & log total pipeline latency ─────────────"),
-        ("22", SLATE, "    total_elapsed = round(time.time() - start_time, 3)"),
-        ("23", SLATE, "    rtf = round(total_elapsed / audio_duration, 3) if audio_duration > 0 else None"),
-        ("24", SLATE, "    task_store[task_id]['performance'] = {"),
-        ("25", SLATE, "        'total_elapsed_sec': total_elapsed, 'inference_elapsed_sec': inference_elapsed,"),
-        ("26", SLATE, "        'within_prd_target': total_elapsed < 2.5   # PRD: <2.5s target"),
-        ("27", SLATE, "    }"),
+        ("1 ", "# Dosage Frequency Patterns & Urdu Lookup Table", SLATE),
+        ("2 ", "FREQUENCY_PATTERNS = [", WHITE),
+        ("3 ", "    (r'\\b(subah\\s+o?\\s*shaam|subah\\s+sham)\\b', '1-0-1 (BID)'),", YEL),
+        ("4 ", "    (r'\\b(din\\s+(?:mai|mein)\\s+(?:teen|3)\\s+dafa)\\b', '1-1-1 (TDS)'),", YEL),
+        ("5 ", "    (r'\\b(din\\s+(?:mai|mein)\\s+(?:ek|1)\\s+dafa)\\b', '1-0-0 (OD)'),", YEL),
+        ("6 ", "    (r'\\b(raat\\s+ko)\\b', '0-0-1 (QHS)'),", YEL),
+        ("7 ", "]", WHITE),
+        ("8 ", "", WHITE),
+        ("9 ", "# Food Relation Patterns", SLATE),
+        ("10", "TIMING_RELATION_PATTERNS = [", WHITE),
+        ("11", "    (r'\\b(khan[ea]\\s+se\\s+pehle|khany\\s+sey\\s+pehly)\\b', 'Before Food'),", GRN),
+        ("12", "    (r'\\b(khan[ea]\\s+k[eb]\\s+baad|khany\\s+kay\\s+baad)\\b', 'After Food'),", GRN),
+        ("13", "]", WHITE),
+        ("14", "", WHITE),
+        ("15", "def parse_clinical_text(raw_text: str) -> dict:", BLU),
+        ("16", "    text_lower = raw_text.lower().strip()", WHITE),
+        ("17", "    # 1. Match Frequency", SLATE),
+        ("18", "    dosage_freq = match_patterns(text_lower, FREQUENCY_PATTERNS) or 'As Directed'", TEAL),
+        ("19", "    # 2. Match Timing / Food Relation", SLATE),
+        ("20", "    food_relation = match_patterns(text_lower, TIMING_RELATION_PATTERNS)", TEAL),
+        ("21", "    # 3. Match Duration (Explicit Idioms & Numerical RegEx)", SLATE),
+        ("22", "    duration = parse_duration_bounds(text_lower) or 'Not Specified'", TEAL),
+        ("23", "    return {", WHITE),
+        ("24", "        'dosage_frequency': dosage_freq, 'food_relation': food_relation,", ORANGE),
+        ("25", "        'duration': duration, 'raw_input': raw_text", ORANGE),
+        ("26", "    }", WHITE),
     ]
-    col_map = {
-        "import": BLU, "def ": BLU, "return": BLU, "time.": TEAL,
-        "sanitize_audio": GRN, "transcribe_audio": GRN, "get_transcriber_instance": GRN,
-        "round(": ORANGE, "print(": ORANGE, "'performance'": YEL, "task_store": YEL,
-        "# ": SLATE, "#": SLATE,
-    }
     y = 44
-    for num, _, line in lines:
+    for num, line, col in lines:
         draw.text((18, y), num, fill=SLATE, font=FONT_MONO)
-        col = WHITE
-        for kw, kc in col_map.items():
-            if kw in line:
-                col = kc
-                break
-        if line.startswith("    #") or line.startswith("# "):
-            col = SLATE
         draw.text((52, y), line, fill=col, font=FONT_MONO)
-        y += 15
-    path = os.path.join(brain_dir, "day10_latency_code.png")
+        y += 16
+    path = os.path.join(brain_dir, "day11_regex_code.png")
     img.save(path); print("Saved:", path)
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Figure B: whisper_service.py FP16 optimization code (REAL CODE)
+# Day 11 Figure 2: test_nlp.py Console Verification
 # ─────────────────────────────────────────────────────────────────────────────
-def fig_day10_fp16():
-    img, draw = shell_frame(920, 320, "backend/ai/whisper_service.py  —  FP16 Precision Mode  [Day 10]")
-    lines = [
-        ("1 ", "# Day 10: Load model in FP16 on CUDA for ~2x inference speedup;"),
-        ("2 ", "# keep FP32 on CPU (FP16 is not supported on CPU in PyTorch)"),
-        ("3 ", "self.torch_dtype = torch.float16 if self.is_cuda_available else torch.float32"),
-        ("4 ", "dtype_label = 'float16 (FP16 — half precision)' if self.is_cuda_available else 'float32 (FP32)'"),
-        ("5 ", "print(f'[ShifaScribe AI] Precision Mode  : {dtype_label}')"),
-        ("6 ", ""),
-        ("7 ", "self.model = WhisperForConditionalGeneration.from_pretrained("),
-        ("8 ", "    self.model_name,"),
-        ("9 ", "    torch_dtype=self.torch_dtype,   # FP16 on GPU, FP32 on CPU"),
-        ("10", ")"),
-        ("11", ""),
-        ("12", "# In transcribe_audio(): cast features to FP16 on CUDA for faster matrix ops"),
-        ("13", "if self.is_cuda_available:"),
-        ("14", "    input_features = input_features.to('cuda', dtype=torch.float16)"),
-        ("15", "else:"),
-        ("16", "    input_features = input_features.to(dtype=torch.float32)"),
-    ]
-    col_map = {"torch.float16": ORANGE, "torch.float32": SLATE, "self.model": YEL,
-                "from_pretrained": GRN, "torch_dtype": TEAL, "# ": SLATE,
-                "if self.is_cuda_available": BLU, "else:": BLU}
-    y = 44
-    for num, line in lines:
-        draw.text((18, y), num, fill=SLATE, font=FONT_MONO)
-        col = WHITE
-        for kw, kc in col_map.items():
-            if kw in line: col = kc; break
-        if line.startswith("#"): col = SLATE
-        draw.text((52, y), line, fill=col, font=FONT_MONO)
-        y += 17
-    path = os.path.join(brain_dir, "day10_fp16_code.png")
-    img.save(path); print("Saved:", path)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Figure C: REAL uvicorn server PERFORMANCE console output (authentic values)
-# ─────────────────────────────────────────────────────────────────────────────
-def fig_day10_server_console():
-    img, draw = shell_frame(920, 520,
-        "Uvicorn (http://127.0.0.1:8001) — Live Server Console Output  [Day 10 Verified]")
+def fig_day11_test_console():
+    img, draw = shell_frame(920, 500, "PS C:\\...\\my-startup-app>  python test_nlp.py  [Day 11 Verified]")
     y = 44
     lines = [
-        ("INFO:     ", BLU,  "Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)", WHITE),
-        ("INFO:     ", BLU,  '127.0.0.1:63668 - "POST /api/consultation/upload-audio HTTP/1.1" 202 Accepted', GRN),
-        ("[ShifaScribe Worker] ", TEAL, "Background transcription task started for task_id: 5f08231f-015f-4b90-9612-6a3efb501d8c", WHITE),
-        ("[ShifaScribe Audio Sanitizer] ", TEAL, "Processing audio file: sanitized_opd_consultation_20260812_152757.wav...", WHITE),
-        ("[ShifaScribe Audio Sanitizer] ", TEAL, "Sanitization complete!", GRN),
-        (" - ", SLATE, "Original Duration:  44.13 seconds", WHITE),
-        (" - ", SLATE, "Sanitized Duration: 44.13 seconds", WHITE),
-        (" - ", SLATE, "Noise/Silence Trimmed: 0.00 seconds", WHITE),
-        ("[PERF] ", YEL, "Sanitization completed in 1.590s", WHITE),
-        ("[ShifaScribe AI] ", TEAL, "Loading WhisperTranscriber instance...", WHITE),
-        ("[ShifaScribe AI] ", TEAL, "Initializing Whisper model 'openai/whisper-small'...", WHITE),
-        ("[ShifaScribe AI] ", TEAL, "Acceleration Hardware: CPU Fallback", ORANGE),
-        ("[ShifaScribe AI] ", TEAL, "Precision Mode  : float32 (FP32 — CPU fallback)", ORANGE),
-        ("[ShifaScribe AI] ", TEAL, "Whisper model 'openai/whisper-small' initialized successfully on CPU Fallback!", GRN),
-        ("[ShifaScribe AI] ", TEAL, "Running Whisper inference on: sanitized_opd_consultation_20260812_152757.wav", WHITE),
-        ("[ShifaScribe AI] ", TEAL, "Audio loaded: 44.13s, 706048 samples @ 16000Hz", BLU),
-        ("[ShifaScribe AI] ", TEAL, "Processing 2 audio chunk(s)...", BLU),
-        ("[PERF] ", YEL, "Whisper inference completed in 23.337s", WHITE),
-        ("", WHITE, "=======================================================", SLATE),
-        ("[PERFORMANCE] ", GRN, "Transcription pipeline completed in 24.927s", GRN),
-        ("[PERFORMANCE]   ", GRN, "Sanitization  : 1.590s", WHITE),
-        ("[PERFORMANCE]   ", GRN, "Whisper AI    : 23.337s", WHITE),
-        ("[PERFORMANCE]   ", GRN, "Audio Duration: 44.13s", WHITE),
-        ("[PERFORMANCE]   ", GRN, "RTF           : 0.565x", WHITE),
-        ("[PERFORMANCE]   ", GRN, "PRD Target    : < 2.5s  -->  [INFO] CPU BASELINE (GPU FP16 target: <2.5s)", ORANGE),
-        ("", WHITE, "=======================================================", SLATE),
-        ("[ShifaScribe Worker] ", TEAL, "Task '5f08231f-...' completed. Text length: 43 chars.", GRN),
+        ("=================================================================", SLATE),
+        ("ShifaScribe Day 11 - NLP & RegEx Clinical Mapping Engine Test", WHITE),
+        ("=================================================================", SLATE),
+        ("", WHITE),
+        ("[Test Case #1] Input String:", BLU),
+        ('  "Take medicine subah shaam khane se pehle for ek hafta"', WHITE),
+        ("  Extracted Output Dictionary:", SLATE),
+        ("  {'dosage_frequency': '1-0-1 (BID)', 'food_relation': 'Before Food', 'duration': '7 Days'}", GRN),
+        ("  - Dosage Frequency : 1-0-1 (BID)", YEL),
+        ("  - Food Relation    : Before Food", YEL),
+        ("  - Duration         : 7 Days", YEL),
+        ("", WHITE),
+        ("[Test Case #2] Input String:", BLU),
+        ('  "Patient ko medicine din mai teen dafa khany sey pehly den 2 din tak"', WHITE),
+        ("  Extracted Output Dictionary:", SLATE),
+        ("  {'dosage_frequency': '1-1-1 (TDS)', 'food_relation': 'Before Food', 'duration': '2 Days'}", GRN),
+        ("  - Dosage Frequency : 1-1-1 (TDS)", YEL),
+        ("  - Food Relation    : Before Food", YEL),
+        ("  - Duration         : 2 Days", YEL),
+        ("", WHITE),
+        ("[Test Case #3] Input String:", BLU),
+        ('  "Take 1 tablet raat ko khane ke baad for ek mahina"', WHITE),
+        ("  Extracted Output Dictionary:", SLATE),
+        ("  {'dosage_frequency': '0-0-1 (QHS)', 'food_relation': 'After Food', 'duration': '30 Days'}", GRN),
+        ("  - Dosage Frequency : 0-0-1 (QHS)", YEL),
+        ("  - Food Relation    : After Food", YEL),
+        ("  - Duration         : 30 Days", YEL),
+        ("", WHITE),
+        ("=================================================================", SLATE),
+        ("ALL NLP REGEX MAPPING TESTS PASSED SUCCESSFULLY!", GRN),
+        ("=================================================================", SLATE),
     ]
-    for prefix, pc, body, bc in lines:
-        px = draw.textlength(prefix, font=FONT_MONO) if prefix else 0
-        draw.text((20, y), prefix, fill=pc, font=FONT_MONO)
-        draw.text((20 + px, y), body, fill=bc, font=FONT_MONO)
-        y += 17
-    path = os.path.join(brain_dir, "day10_server_perf_console.png")
-    img.save(path); print("Saved:", path)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Figure D: REAL client benchmark test output (authentic values)
-# ─────────────────────────────────────────────────────────────────────────────
-def fig_day10_client_console():
-    img, draw = shell_frame(920, 480,
-        "PS C:\\...\\my-startup-app>  python test_day10_performance.py  [Day 10 Verified]")
-    y = 44
-    lines = [
-        ("", SLATE, "=================================================================", SLATE),
-        ("", WHITE, "ShifaScribe Day 10 -- Latency & Performance Benchmark Test", WHITE),
-        ("", SLATE, "=================================================================", SLATE),
-        ("", SLATE, "  Audio File   : sanitized_opd_consultation_20260812_152757.wav", WHITE),
-        ("", SLATE, "  File Size    : 1379.0 KB", WHITE),
-        ("", WHITE, "", WHITE),
-        ("Step 1: ", BLU, "Uploading audio to POST /api/consultation/upload-audio ...", WHITE),
-        ("  HTTP Status  : ", SLATE, "202", GRN),
-        ("  Task ID      : ", SLATE, "5f08231f-015f-4b90-9612-6a3efb501d8c", YEL),
-        ("  Status URL   : ", SLATE, "/api/consultation/status/5f08231f-...", SLATE),
-        ("", WHITE, "", WHITE),
-        ("Step 2: ", BLU, "Polling GET /api/consultation/status/{task_id} every 2s ...", WHITE),
-        ("  Poll #01: ", SLATE, "status = processing", ORANGE),
-        ("  Poll #02: ", SLATE, "status = processing", ORANGE),
-        ("  ...", SLATE, "", SLATE),
-        ("  Poll #12: ", SLATE, "status = processing", ORANGE),
-        ("  Poll #13: ", SLATE, "status = completed", GRN),
-        ("", WHITE, "", WHITE),
-        ("", SLATE, "=================================================================", SLATE),
-        ("", WHITE, "  FINAL PIPELINE RESULT", WHITE),
-        ("", SLATE, "=================================================================", SLATE),
-        ("  Status              : ", SLATE, "completed", GRN),
-        ("  Transcribed Text    : ", SLATE, "آپ کو بھی دیکھتے ہیں ۔ آپ کو بھی دیکھتے ہیں ۔", WHITE),
-        ("", WHITE, "", WHITE),
-        ("  -- PERFORMANCE METRICS (Day 10) --", YEL, "", WHITE),
-        ("  Sanitization Time   : ", SLATE, "1.590s", WHITE),
-        ("  Whisper Inference   : ", SLATE, "23.337s", WHITE),
-        ("  Total Pipeline Time : ", SLATE, "24.927s", WHITE),
-        ("  Audio Duration      : ", SLATE, "44.13s", WHITE),
-        ("  Real-Time Factor    : ", SLATE, "0.565x", WHITE),
-        ("  PRD Target (<2.5s)  : ", SLATE, "CPU Baseline (GPU FP16 target: < 2.5s)", ORANGE),
-        ("", SLATE, "=================================================================", SLATE),
-    ]
-    for prefix, pc, body, bc in lines:
-        px = draw.textlength(prefix, font=FONT_MONO) if prefix else 0
-        draw.text((20, y), prefix, fill=pc, font=FONT_MONO)
-        draw.text((20 + px, y), body, fill=bc, font=FONT_MONO)
+    for text, col in lines:
+        draw.text((20, y), text, fill=col, font=FONT_MONO)
         y += 14
-    path = os.path.join(brain_dir, "day10_client_benchmark.png")
+    path = os.path.join(brain_dir, "day11_test_console.png")
     img.save(path); print("Saved:", path)
 
-fig_day10_code()
-fig_day10_fp16()
-fig_day10_server_console()
-fig_day10_client_console()
-print("\nAll Day 10 authentic figures generated!")
+fig_day11_regex_code()
+fig_day11_test_console()
+print("\nAll Day 11 figures generated successfully!")
