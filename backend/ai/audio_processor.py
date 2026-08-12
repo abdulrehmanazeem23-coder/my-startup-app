@@ -5,11 +5,7 @@ import soundfile as sf
 def sanitize_audio(input_path: str, output_path: str, top_db: int = 20) -> dict:
     """
     Sanitizes raw audio input by trimming leading/trailing silence and ambient background room noise.
-    
-    :param input_path: Path to raw input audio file (.webm, .wav, .mp3)
-    :param output_path: Path where sanitized audio file will be saved (.wav / .webm)
-    :param top_db: The threshold (in decibels) below reference to consider as silence (default: 20dB)
-    :return: Dictionary containing sanitization metrics and output metadata
+    Ensures the output is saved as a 16kHz WAV file compatible with librosa and soundfile.
     """
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Input audio file not found at: {input_path}")
@@ -17,6 +13,10 @@ def sanitize_audio(input_path: str, output_path: str, top_db: int = 20) -> dict:
     print(f"[ShifaScribe Audio Sanitizer] Loading audio file: {input_path}...")
     
     try:
+        # Ensure output file path uses .wav extension for soundfile compatibility
+        if not output_path.endswith(".wav"):
+            output_path = os.path.splitext(output_path)[0] + ".wav"
+
         # Load audio file forcing 16kHz sample rate for Whisper AI optimal compliance
         y, sr = librosa.load(input_path, sr=16000)
         original_duration = len(y) / sr
@@ -29,8 +29,8 @@ def sanitize_audio(input_path: str, output_path: str, top_db: int = 20) -> dict:
         # Ensure target directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-        # Write sanitized audio file back to disk
-        sf.write(output_path, y_trimmed, sr)
+        # Write sanitized audio array as 16kHz WAV format
+        sf.write(output_path, y_trimmed, sr, format="WAV", subtype="PCM_16")
 
         print(f"[ShifaScribe Audio Sanitizer] Sanitization complete!")
         print(f" - Original Duration: {original_duration:.2f} seconds")

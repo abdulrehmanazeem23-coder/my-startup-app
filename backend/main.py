@@ -64,26 +64,29 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
     print(f"[ShifaScribe Worker] Background transcription task started for task_id: {task_id}")
     
     try:
-        # Step 1: Sanitize raw audio input
-        sanitized_filename = f"sanitized_{os.path.basename(raw_file_path)}"
-        sanitized_file_path = os.path.join(STORAGE_DIR, sanitized_filename)
+        # Step 1: Sanitize raw audio input (force .wav extension for soundfile format support)
+        base_name = os.path.splitext(os.path.basename(raw_file_path))[0]
+        sanitized_file_path = os.path.join(STORAGE_DIR, f"sanitized_{base_name}.wav")
         
         sanitization_res = sanitize_audio(raw_file_path, sanitized_file_path, top_db=20)
         
+        # Target audio path for Whisper AI (use sanitized WAV if available, else raw audio)
+        target_audio_path = sanitized_file_path if os.path.exists(sanitized_file_path) else raw_file_path
+
         # Step 2: Run Whisper AI speech-to-text inference
         ai_engine = get_transcriber_instance()
-        transcription_res = ai_engine.transcribe_audio(sanitized_file_path, language="ur")
+        transcription_res = ai_engine.transcribe_audio(target_audio_path, language="ur")
         
         transcribed_text = transcription_res.get("text", "")
         
-        # Step 3: Update task_store
+        # Step 3: Update task_store with completion status
         task_store[task_id] = {
             "status": "completed",
             "task_id": task_id,
             "consultation_id": consultation_id,
             "text": transcribed_text,
             "raw_file_path": raw_file_path,
-            "sanitized_file_path": sanitized_file_path,
+            "sanitized_file_path": target_audio_path,
             "sanitization": sanitization_res,
             "transcription_metadata": transcription_res,
             "completed_at": datetime.now().isoformat(),
