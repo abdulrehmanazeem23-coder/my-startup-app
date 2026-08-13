@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -36,6 +36,8 @@ class ConsultationLog(Base):
     file_size_kb = Column(Float, nullable=False)
     mime_type = Column(String(50), default="audio/webm")
     status = Column(String(50), default="recorded")
+    transcription_text = Column(Text, nullable=True)
+    structured_ehr = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     patient = relationship("Patient", back_populates="consultations")

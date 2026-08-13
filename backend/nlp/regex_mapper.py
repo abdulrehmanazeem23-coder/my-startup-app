@@ -14,34 +14,29 @@ from typing import Dict, Optional
 
 # Dosage Frequency Rules (Pattern -> Clean Medical Standard)
 FREQUENCY_PATTERNS = [
-    # Subah Shaam (Morning & Evening) -> BID (Twice Daily)
+    # TDS (Three Times Daily)
     (
-        r"\b(subah\s+o?\s*shaam|subah\s+sham|subah\s+o?\s*shaam|صبح\s*شام)\b",
-        "1-0-1 (BID)",
-    ),
-    # Din mai teen dafa / 3 times a day -> TDS (Three Times Daily)
-    (
-        r"\b(din\s+(?:mai|mein|mian)\s+(?:teen|3)\s+dafa|(?:teen|3)\s+dafa\s+din\s+(?:mai|mein)|دن\s*میں\s*تین\s*دفعہ)\b",
+        r"\b(din\s+(?:mai|mein|mian)\s+(?:teen|3)\s+dafa|(?:teen|3)\s+dafa\s+din\s+(?:mai|mein)|دن\s*میں\s*تین\s*دفعہ|tds|t\.d\.s|three\s+times\s+a\s+day)\b",
         "1-1-1 (TDS)",
     ),
-    # Din mai do dafa / 2 times a day -> BID
+    # BID (Twice Daily)
     (
-        r"\b(din\s+(?:mai|mein|mian)\s+(?:do|2)\s+dafa|(?:do|2)\s+dafa\s+din\s+(?:mai|mein))\b",
+        r"\b(subah\s+o?\s*shaam|subah\s+sham|subah\s+o?\s*shaam|صبح\s*شام|din\s+(?:mai|mein|mian)\s+(?:do|2)\s+dafa|(?:do|2)\s+dafa\s+din\s+(?:mai|mein)|bid|b\.i\.d|twice\s+daily)\b",
         "1-0-1 (BID)",
     ),
-    # Din mai ek dafa / Once a day -> OD
+    # OD (Once Daily)
     (
-        r"\b(din\s+(?:mai|mein|mian)\s+(?:ek|1)\s+dafa|(?:ek|1)\s+dafa\s+din\s+(?:mai|mein)|ایک\s*دفعہ\s*دن\s*میں)\b",
+        r"\b(din\s+(?:mai|mein|mian)\s+(?:ek|1)\s+dafa|(?:ek|1)\s+dafa\s+din\s+(?:mai|mein)|ایک\s*دفعہ\s*دن\s*میں|od|o\.d|once\s+daily)\b",
         "1-0-0 (OD)",
     ),
-    # Raat ko / Night time -> QHS
+    # QHS (Nightly)
     (
-        r"\b(raat\s+ko(?:\s+ek\s+dafa)?|راات\s*کو|رات\s*کو)\b",
+        r"\b(raat\s+ko(?:\s+ek\s+dafa)?|راات\s*کو|رات\s*کو|qhs|q\.h\.s|nightly)\b",
         "0-0-1 (QHS)",
     ),
-    # Har 8 ghante / Every 8 hours -> Q8H
+    # Q8H (Every 8 hours)
     (
-        r"\b(har\s+(?:8|aath)\s+(?:ghante|ghente|hours?))\b",
+        r"\b(har\s+(?:8|aath)\s+(?:ghante|ghente|hours?)|q8h|q\.8\.h)\b",
         "Every 8 Hours (Q8H)",
     ),
 ]
@@ -50,12 +45,12 @@ FREQUENCY_PATTERNS = [
 TIMING_RELATION_PATTERNS = [
     # Khane se pehle / Before food
     (
-        r"\b(khan[ea]\s+se\s+pehle|khany\s+sey\s+pehly|khan[ea]\s+sey\s+pehl[ea]|کھانے\s*سے\s*پہلے)\b",
+        r"\b(khan[ea]\s+se\s+pehle|khany\s+sey\s+pehly|khan[ea]\s+sey\s+pehl[ea]|کھانے\s*سے\s*پہلے|before\s+food|before\s+meals?)\b",
         "Before Food",
     ),
     # Khane ke baad / After food
     (
-        r"\b(khan[ea]\s+k[eb]\s+baad|khany\s+kay\s+baad|کھانے\s*کے\s*بعد)\b",
+        r"\b(khan[ea]\s+k[eb]\s+baad|khany\s+kay\s+baad|کھانے\s*کے\s*بعد|after\s+food|after\s+meals?)\b",
         "After Food",
     ),
 ]
@@ -84,7 +79,7 @@ EXPLICIT_DURATION_MAP = [
     (r"\b(teen\s+hafta|3\s+hafta|three\s+weeks)\b", "21 Days"),
     (r"\b(ek\s+mahina|1\s+mahina|one\s+month|mahina|مہینہ|ایک\s*مہینہ)\b", "30 Days"),
     (r"\b(do\s+mahina|2\s+mahina|two\s+months|دو\s*مہینے)\b", "60 Days"),
-    (r"\b(do\s+din|2\s+din|two\s+days|دو\s*دن)\b", "2 Days"),
+    (r"\b(do\s+din(?:\s+sey|\s+se)?|2\s+din(?:\s+sey|\s+se)?|two\s+days|دو\s*دن)\b", "2 Days"),
 ]
 
 
@@ -143,7 +138,7 @@ def parse_clinical_text(raw_text: str) -> Dict[str, Optional[str]]:
     # If no explicit duration found, try generic RegEx numerical bounds
     if not duration:
         # Pattern: [number/word] [din|days|hafta|hafte|weeks|mahina|mahine|months]
-        dur_pattern = r"\b(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen)\s*(din|days?|hafta|hafte|weeks?|mahina|mahine|months?)\b"
+        dur_pattern = r"\b(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen)\s*(?:sey|se|for)?\s*(din|days?|hafta|hafte|weeks?|mahina|mahine|months?)\b"
         match = re.search(dur_pattern, text_lower, re.IGNORECASE)
         if match:
             num_str, unit_str = match.group(1), match.group(2)

@@ -2,6 +2,7 @@ import os
 import uuid
 import time
 import shutil
+import json
 from datetime import datetime
 from typing import Optional
 
@@ -12,18 +13,19 @@ from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, sta
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from database import engine, Base, get_db
+from database import engine, Base, get_db, SessionLocal
 import models
 from ai.audio_processor import sanitize_audio
 from ai.whisper_service import WhisperTranscriber
+from nlp.entity_extractor import extract_full_prescription
 
 # Auto-create database tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="ShifaScribe AI Medical Scribe API",
-    description="FastAPI Backend, Audio Processing & Local Whisper AI Engine",
-    version="0.3.0",
+    description="FastAPI Backend, Audio Processing, Whisper AI Engine & NLP Entity Extractor",
+    version="0.4.0",
 )
 
 # CORS Middleware configuration
@@ -59,11 +61,11 @@ def get_transcriber_instance() -> WhisperTranscriber:
 
 def process_transcription_task(task_id: str, raw_file_path: str, consultation_id: Optional[int] = None):
     """
-    Background Task Worker (Day 10 — Latency Tracked):
+    Background Task Worker (Day 12 — Latency Tracked & NLP Entity Extraction):
     1. Sanitizes raw audio input using Librosa (noise reduction & silence trimming).
     2. Runs Whisper AI speech-to-text inference (fp16 on GPU, float32 on CPU).
-    3. Tracks total elapsed time and logs PERFORMANCE metric to console.
-    4. Updates task_store with the final transcribed text and latency data.
+    3. Passes raw transcribed text through NLP entity_extractor for structured EHR JSON.
+    4. Updates task_store and saves structured EHR JSON into consultation_logs database table.
     """
     global task_store
     print(f"[ShifaScribe Worker] Background transcription task started for task_id: {task_id}")
@@ -73,7 +75,6 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
         base_name = os.path.splitext(os.path.basename(raw_file_path))[0]
         sanitized_file_path = os.path.join(STORAGE_DIR, f"sanitized_{base_name}.wav")
 
-        # Day 10: Start latency timer right before sanitization begins
         start_time = time.time()
 
         sanitization_res = sanitize_audio(raw_file_path, sanitized_file_path, top_db=30)
@@ -112,12 +113,20 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
 
         transcribed_text = transcription_res.get("text", "")
 
-        # ── Step 4: Update task_store with completion status & metrics ─────
+        # ── Step 4: Day 12 NLP Entity Extraction ───────────────────────────
+        structured_ehr = extract_full_prescription(transcribed_text)
+        print(f"[ShifaScribe NLP] Extracted Symptoms   : {structured_ehr.get('symptoms')}")
+        print(f"[ShifaScribe NLP] Extracted Medications: {structured_ehr.get('medications')}")
+        print(f"[ShifaScribe NLP] Dosage Frequency     : {structured_ehr.get('dosage_frequency')}")
+        print(f"[ShifaScribe NLP] Duration             : {structured_ehr.get('duration')}")
+
+        # ── Step 5: Update in-memory task_store ─────────────────────────────
         task_store[task_id] = {
             "status": "completed",
             "task_id": task_id,
             "consultation_id": consultation_id,
             "text": transcribed_text,
+            "structured_ehr": structured_ehr,
             "raw_file_path": raw_file_path,
             "sanitized_file_path": target_audio_path,
             "sanitization": sanitization_res,
@@ -133,7 +142,23 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
             },
             "completed_at": datetime.now().isoformat(),
         }
-        print(f"[ShifaScribe Worker] Task '{task_id}' completed. Text length: {len(transcribed_text)} chars.")
+
+        # ── Step 6: Save structured EHR JSON to DB consultation_logs table ──
+        if consultation_id:
+            try:
+                db = SessionLocal()
+                consultation = db.query(models.ConsultationLog).filter(models.ConsultationLog.id == consultation_id).first()
+                if consultation:
+                    consultation.status = "completed"
+                    consultation.transcription_text = transcribed_text
+                    consultation.structured_ehr = json.dumps(structured_ehr)
+                    db.commit()
+                    print(f"[ShifaScribe DB] Updated ConsultationLog (id={consultation_id}) with transcription & structured EHR JSON!")
+                db.close()
+            except Exception as db_err:
+                print(f"[ShifaScribe DB] Error saving to database log: {db_err}")
+
+        print(f"[ShifaScribe Worker] Task '{task_id}' completed successfully!")
     except Exception as e:
         print(f"[ShifaScribe Worker] Task '{task_id}' failed: {e}")
         task_store[task_id] = {
@@ -156,10 +181,10 @@ def read_root():
 def health_check():
     return {
         "status": "API is running",
-        "service": "ShifaScribe Audio & AI Engine",
-        "version": "0.3.0",
+        "service": "ShifaScribe Audio, AI Engine & NLP Extractor",
+        "version": "0.4.0",
         "ai_model": "openai/whisper-small",
-        "prd_latency_target_sec": 2.5,
+        "nlp_engine": "ShifaScribe RegEx & Entity Extractor (Day 12)",
     }
 
 # Day 8 Endpoint: Asynchronous Audio Upload with Background Whisper Task
@@ -218,7 +243,7 @@ async def upload_consultation_audio(
 
         return {
             "status": "processing",
-            "message": "Audio file uploaded successfully. Asynchronous transcription started.",
+            "message": "Audio file uploaded successfully. Asynchronous transcription & NLP extraction started.",
             "task_id": task_id,
             "consultation_id": consultation_entry.id,
             "filename": saved_filename,
