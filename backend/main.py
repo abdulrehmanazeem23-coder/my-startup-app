@@ -134,8 +134,11 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
         raw_whisper_text = transcription_res.get("text", "")
         # Apply Clinical Phonetic Auto-Corrector (fixes penadol/punadol/ Urdu phonetics -> Panadol)
         transcribed_text = autocorrect_transcript(raw_whisper_text)
-        print(f"[ShifaScribe Auto-Correct] Raw Whisper : '{raw_whisper_text}'")
-        print(f"[ShifaScribe Auto-Correct] Clean Result: '{transcribed_text}'")
+        try:
+            print(f"[ShifaScribe Auto-Correct] Raw Whisper : '{raw_whisper_text}'")
+            print(f"[ShifaScribe Auto-Correct] Clean Result: '{transcribed_text}'")
+        except Exception:
+            print(f"[ShifaScribe Auto-Correct] Transcribed {len(transcribed_text)} characters")
 
         # ── Step 4: Day 12 NLP Entity Extraction ───────────────────────────
         structured_ehr = extract_full_prescription(transcribed_text)

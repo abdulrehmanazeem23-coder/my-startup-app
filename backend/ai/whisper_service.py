@@ -134,10 +134,16 @@ class WhisperTranscriber:
                 
                 if chunk_text:
                     all_transcriptions.append(chunk_text)
-                    print(f"[ShifaScribe AI] Chunk {i+1}/{len(chunks_to_process)}: '{chunk_text}'")
+                    try:
+                        print(f"[ShifaScribe AI] Chunk {i+1}/{len(chunks_to_process)}: '{chunk_text}'")
+                    except Exception:
+                        print(f"[ShifaScribe AI] Chunk {i+1}/{len(chunks_to_process)}: ({len(chunk_text)} chars)")
 
             transcribed_text = " ".join(all_transcriptions).strip()
-            print(f"[ShifaScribe AI] Transcription complete. Final output: '{transcribed_text}' ({len(transcribed_text)} chars)")
+            try:
+                print(f"[ShifaScribe AI] Transcription complete. Final output: '{transcribed_text}' ({len(transcribed_text)} chars)")
+            except Exception:
+                print(f"[ShifaScribe AI] Transcription complete. Output length: {len(transcribed_text)} chars")
             
             return {
                 "status": "success",
