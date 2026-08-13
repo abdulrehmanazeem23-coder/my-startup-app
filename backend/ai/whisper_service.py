@@ -7,6 +7,7 @@ os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 import torch
 import librosa
 import numpy as np
+from typing import Optional
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
 # Whisper processes audio in 30-second windows at 16kHz
@@ -37,8 +38,6 @@ class WhisperTranscriber:
         print(f"[ShifaScribe AI] Acceleration Hardware: {self.device_label}")
         
         try:
-            # Day 10: Load model in FP16 on CUDA for ~2x inference speedup;
-            # keep FP32 on CPU (FP16 is not supported on CPU in PyTorch)
             self.torch_dtype = torch.float16 if self.is_cuda_available else torch.float32
             dtype_label = "float16 (FP16 — half precision)" if self.is_cuda_available else "float32 (FP32 — CPU fallback)"
             print(f"[ShifaScribe AI] Precision Mode  : {dtype_label}")
@@ -46,7 +45,7 @@ class WhisperTranscriber:
             self.processor = WhisperProcessor.from_pretrained(self.model_name)
             self.model = WhisperForConditionalGeneration.from_pretrained(
                 self.model_name,
-                torch_dtype=self.torch_dtype,   # FP16 on GPU, FP32 on CPU
+                torch_dtype=self.torch_dtype,
             )
             
             if self.is_cuda_available:
@@ -59,25 +58,23 @@ class WhisperTranscriber:
             raise e
 
     def _pad_or_trim(self, audio: np.ndarray) -> np.ndarray:
-        """
-        Pad or trim audio to exactly 30 seconds (480,000 samples at 16kHz).
-        Whisper was trained on 30-second log-mel spectrograms — short clips
-        that aren't padded cause the model to 'repeat' or miss tokens.
-        """
+        """Pad or trim audio array to exactly 30 seconds (480,000 samples at 16kHz)."""
         if len(audio) > WHISPER_N_SAMPLES:
-            # For longer audio, split and concatenate results outside this func
             audio = audio[:WHISPER_N_SAMPLES]
         else:
-            # Zero-pad to 30 seconds
             pad_width = WHISPER_N_SAMPLES - len(audio)
             audio = np.pad(audio, (0, pad_width), mode="constant")
         return audio
 
-    def transcribe_audio(self, file_path: str, language: str = "ur") -> dict:
+    def transcribe_audio(self, file_path: str, language: Optional[str] = None) -> dict:
+        """
+        Transcribes clinical audio dictation file.
+        If language=None, auto-detects language for seamless code-switched (Urdu + English) recognition.
+        """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Audio file not found at path: {file_path}")
 
-        print(f"[ShifaScribe AI] Running Whisper inference on: {file_path} (Hardware: {self.device_label})...")
+        print(f"[ShifaScribe AI] Running Whisper inference on: {file_path} (Language Mode: {language or 'Auto-Detect Code-Switched'})...")
 
         try:
             # Load raw audio array using librosa at 16kHz
@@ -89,11 +86,9 @@ class WhisperTranscriber:
 
             # Process in 30-second chunks for longer recordings
             if len(y) <= WHISPER_N_SAMPLES:
-                # Short audio: pad to full 30-second window for best accuracy
                 chunk = self._pad_or_trim(y)
                 chunks_to_process = [chunk]
             else:
-                # Long audio: split into overlapping 30-second windows
                 stride = WHISPER_SAMPLE_RATE * 25  # 25-second stride (5s overlap)
                 chunks_to_process = []
                 for start in range(0, len(y), stride):
@@ -105,35 +100,35 @@ class WhisperTranscriber:
             print(f"[ShifaScribe AI] Processing {len(chunks_to_process)} audio chunk(s)...")
 
             for i, chunk in enumerate(chunks_to_process):
-                # Build log-mel spectrogram features (Whisper's native input format)
                 input_features = self.processor(
                     chunk,
                     sampling_rate=WHISPER_SAMPLE_RATE,
                     return_tensors="pt"
                 ).input_features
 
-                # Day 10: Cast features to FP16 on CUDA for faster matrix ops
                 if self.is_cuda_available:
                     input_features = input_features.to("cuda", dtype=torch.float16)
                 else:
                     input_features = input_features.to(dtype=torch.float32)
 
-                # Force language & transcription task decoder tokens
-                forced_decoder_ids = self.processor.get_decoder_prompt_ids(
-                    language=language, task="transcribe"
-                )
+                # Configure forced decoder tokens only if explicit language is requested
+                gen_kwargs = {
+                    "num_beams": 5,
+                    "temperature": 0.0,
+                    "compression_ratio_threshold": 2.4,
+                    "logprob_threshold": -1.0,
+                    "no_speech_threshold": 0.6,
+                }
+
+                if language:
+                    gen_kwargs["forced_decoder_ids"] = self.processor.get_decoder_prompt_ids(
+                        language=language, task="transcribe"
+                    )
 
                 with torch.no_grad():
                     predicted_ids = self.model.generate(
                         input_features,
-                        forced_decoder_ids=forced_decoder_ids,
-                        # Generation quality settings
-                        num_beams=5,               # Beam search for better accuracy
-                        temperature=0.0,           # Greedy / deterministic decoding
-                        condition_on_prev_tokens=False,
-                        compression_ratio_threshold=2.4,
-                        logprob_threshold=-1.0,
-                        no_speech_threshold=0.6,
+                        **gen_kwargs
                     )
 
                 chunk_text = self.processor.batch_decode(
@@ -151,7 +146,7 @@ class WhisperTranscriber:
                 "status": "success",
                 "text": transcribed_text,
                 "model": self.model_name,
-                "language": language,
+                "language": language or "auto",
                 "hardware": self.device_label,
                 "audio_duration_sec": round(audio_duration, 2),
                 "chunks_processed": len(chunks_to_process),

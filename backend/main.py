@@ -96,7 +96,7 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
 
         start_time = time.time()
 
-        sanitization_res = sanitize_audio(raw_file_path, sanitized_file_path, top_db=30)
+        sanitization_res = sanitize_audio(raw_file_path, sanitized_file_path, top_db=45)
         sanitization_elapsed = round(time.time() - start_time, 3)
         print(f"[PERF] Sanitization completed in {sanitization_elapsed:.3f}s")
 
@@ -107,7 +107,8 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
         inference_start = time.time()
 
         ai_engine = get_transcriber_instance()
-        transcription_res = ai_engine.transcribe_audio(target_audio_path, language="ur")
+        # language=None enables auto-detection for code-switched (Urdu + English) dictation
+        transcription_res = ai_engine.transcribe_audio(target_audio_path, language=None)
 
         inference_elapsed = round(time.time() - inference_start, 3)
         print(f"[PERF] Whisper inference completed in {inference_elapsed:.3f}s")
