@@ -17,7 +17,7 @@ from .drap_validator import validate_medication
 
 SYMPTOM_LOOKUP = [
     # Headache / Head pain
-    (r"\b(headache|sir\s*(?:mai|mein)?\s*dard|head\s+pain|sir\s+dard)\b", "Headache"),
+    (r"\b(headache|sir\s*(?:mai|mein)?\s*dard|head\s+pain|sir\s+dard|سویئر\s*ہیڈک|ہیڈک|ہیڈیک|سر\s*میں\s*درد)\b", "Headache"),
     # Chest pain
     (r"\b(chest\s+pain|sine\s*(?:mai|mein)?\s*dard|seene\s*(?:mai|mein)?\s*dard)\b", "Chest Pain"),
     # Chest tightness
@@ -27,15 +27,15 @@ SYMPTOM_LOOKUP = [
     # General pain / dard
     (r"\b(body\s+ache|jism\s*(?:mai|mein)?\s*dard|jism\s+dard)\b", "Body Ache"),
     # Fever / Bukhar
-    (r"\b(fever|high\s+fever|bukhar|buhar|تبہ|بخار)\b", "Fever"),
+    (r"\b(fever|high\s+fever|bukhar|buhar|تبہ|بخار|فیور)\b", "Fever"),
     # Cough / Khansi
     (r"\b(cough|persistent\s+cough|khansi|کھانسی)\b", "Cough"),
     # Vomiting / Ulti
-    (r"\b(vomiting|vomit|ulti|الٹی)\b", "Vomiting"),
+    (r"\b(vomiting|vomit|ulti|الٹی|ووماٹینگ|وومٹنگ)\b", "Vomiting"),
     # Nausea / Matli
     (r"\b(nausea|matli)\b", "Nausea"),
     # Flu / Cold / Zukaam / Nazla
-    (r"\b(flu|cold|zukaam|zukam|nazla|نزلہ|زکام)\b", "Flu/Cold"),
+    (r"\b(flu|cold|zukaam|zukam|nazla|نزلہ|زکام|فلو)\b", "Flu/Cold"),
     # Dizziness / Chakar
     (r"\b(dizziness|dizzy|chakar|چکر)\b", "Dizziness"),
     # Diarrhea / Dast
