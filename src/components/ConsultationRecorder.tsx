@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { StructuredEhrData } from "./PrescriptionForm";
 
 export type RecordingState = "idle" | "recording" | "processing";
