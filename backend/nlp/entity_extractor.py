@@ -1,13 +1,14 @@
 """
 ShifaScribe NLP Entity Extractor Module
 Extracts localized Symptoms (chief complaints) and Prescribed Medications (drugs, forms, strengths)
-from unstructured code-switched (Urdu/English) transcription strings.
+from unstructured code-switched (Urdu/English) transcription strings and validates them against the DRAP catalog.
 """
 
 import re
 from typing import List, Dict, Any, Optional
 
 from .regex_mapper import parse_clinical_text
+from .drap_validator import validate_medication
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +168,8 @@ def extract_medications(text: str) -> List[str]:
 def extract_full_prescription(raw_text: str) -> Dict[str, Any]:
     """
     Master NLP Extraction Function:
-    Combines RegEx duration/frequency mapper with Symptom & Medication entity extractors.
+    Combines RegEx duration/frequency mapper with Symptom & Medication entity extractors
+    and validates all extracted drug names against the official DRAP medicine catalog via fuzzy matching.
 
     Args:
         raw_text (str): Transcribed patient dictation string.
@@ -183,11 +185,18 @@ def extract_full_prescription(raw_text: str) -> Dict[str, Any]:
     """
     parsed_regex = parse_clinical_text(raw_text)
     symptoms = extract_symptoms(raw_text)
-    medications = extract_medications(raw_text)
+    raw_medications = extract_medications(raw_text)
+
+    # Pass all extracted medications through DRAP fuzzy matching catalog validator
+    validated_medications = []
+    for med in raw_medications:
+        validated = validate_medication(med, threshold=70)
+        if validated and validated not in validated_medications:
+            validated_medications.append(validated)
 
     return {
         "symptoms": symptoms,
-        "medications": medications,
+        "medications": validated_medications,
         "dosage_frequency": parsed_regex.get("dosage_frequency", "As Directed"),
         "duration": parsed_regex.get("duration", "Not Specified"),
         "food_relation": parsed_regex.get("food_relation"),
