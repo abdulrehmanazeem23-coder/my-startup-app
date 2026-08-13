@@ -107,7 +107,7 @@ card_data = [
     ("Submitted To (Supervisor):",   "Khubaib Ahmed"),
     ("Project Name:",                "ShifaScribe (Urdu Medical Speech AI)"),
     ("Reporting Scope:",             "Week 3 (Sprint 3: Days 11 to 15)"),
-    ("Verification Status:",         "Days 11, 12 & 13 — Tested & Verified (100% Passed)"),
+    ("Verification Status:",         "Days 11, 12, 13 & 14 — Tested & Verified (100% Passed)"),
     ("Submission Date:",             "August 13, 2026"),
 ]
 tc = doc.add_table(rows=6, cols=2)
@@ -130,9 +130,9 @@ doc.add_page_break()
 # EXECUTIVE SUMMARY
 # ═══════════════════════════════════════════════════════
 h1("Executive Summary")
-body("Sprint 3 (Days 11–15) focuses on Natural Language Processing (NLP), clinical entity extraction, DRAP catalog fuzzy validation, and automated EHR JSON note generation. Day 11 established the RegEx mapping engine. Day 12 built the Symptom & Medication Entity Extractor module with SQLite database persistence. Day 13 implements the DRAP Medicine Catalog Fallback Validator using Levenshtein fuzzy string distance matching to auto-correct phonetic drug misspellings.")
+body("Sprint 3 (Days 11–15) focuses on Natural Language Processing (NLP), clinical entity extraction, DRAP catalog fuzzy validation, automated EHR JSON note generation, and interactive frontend prescription UI integration. Day 11 established the RegEx mapping engine. Day 12 built the Symptom & Medication Entity Extractor module. Day 13 implemented the DRAP Medicine Catalog Fallback Validator. Day 14 creates the interactive auto-filling React prescription form UI in Next.js.")
 callout(
-    "Days 11, 12 & 13 are 100% complete and verified. The system extracts symptoms (['Headache']), maps dosage directives ('1-1-1 (TDS)'), parses duration ('2 Days'), and auto-corrects misspelled transcribed drug names against official DRAP catalog (e.g. 'Punudol 500mg' -> 'Tab. Panadol 500mg'). Passed all standalone test verification scripts (test_nlp.py, test_entity_extractor.py, test_drap_validator.py).",
+    "Days 11, 12, 13 & 14 are 100% complete and verified. The Next.js frontend now features an interactive PrescriptionForm component connected to the FastAPI Whisper & DRAP NLP pipeline. Upon audio recording completion, chief complaints, DRAP-validated medications, dosage frequency, and duration instantly auto-fill into clean, editable clinical fields.",
     "Sprint 3 Status:"
 )
 
@@ -246,12 +246,40 @@ callout(
 figure("day13_test_console.png", "Figure 8: test_drap_validator.py authentic terminal output — successful auto-correction of misspelled drugs against DRAP catalog")
 
 # ═══════════════════════════════════════════════════════
+# DAY 14
+# ═══════════════════════════════════════════════════════
+h1("Day 14 Implementation: Interactive Auto-Filling Prescription Form UI")
+
+h2("Interactive Prescription Form Component")
+body("A new React component src/components/PrescriptionForm.tsx was designed with a modern, clinical dark slate & emerald theme. The component accepts structuredData and status as props. An internal useEffect hook automatically populates form fields instantly upon AI transcription completion:")
+
+bullet_data_14 = [
+    ("Chief Complaints / Symptoms:", "Renders editable symptom tags with manual '+ Add' input and individual 'x' deletion badges."),
+    ("Prescribed Medications Table:", "Renders DRAP-validated drug cards (e.g., 'Tab. Panadol 500mg') with inline editing, row deletion, and '+ Add Drug' controls."),
+    ("Dosage & Duration Controls:", "Clean side-by-side inputs for translated dosage frequency ('1-1-1 (TDS)') and numerical duration ('2 Days')."),
+    ("Action Toolbar:", "Includes 'Copy Prescription' (clipboard formatting), 'Save to Patient EHR' (simulated database commit with toast badge), and 'Reset Form' buttons."),
+]
+
+for title, desc in bullet_data_14:
+    p = doc.add_paragraph(style='List Bullet')
+    p.paragraph_format.space_after = Pt(4)
+    r1 = p.add_run(title + " ")
+    r1.font.name, r1.font.size, r1.font.bold, r1.font.color.rgb = "Calibri", Pt(10.5), True, COLOR_NAVY
+    r2 = p.add_run(desc)
+    r2.font.name, r2.font.size, r2.font.color.rgb = "Calibri", Pt(10.5), COLOR_DARK
+
+figure("day14_prescription_form_code.png", "Figure 9: src/components/PrescriptionForm.tsx — React interactive auto-filling prescription form implementation")
+
+h2("Next.js Workspace Integration")
+body("ConsultationRecorder.tsx and src/app/page.tsx were updated. When task status polling receives status 'completed', statusData.structured_ehr is passed to the parent page state and fed directly into PrescriptionForm. The doctor workspace UI automatically displays the auto-filled prescription form right below the voice recorder.")
+figure("day14_page_integration_code.png", "Figure 10: src/app/page.tsx — Doctor workspace integrating ConsultationRecorder and PrescriptionForm UI")
+
+# ═══════════════════════════════════════════════════════
 # ROADMAP
 # ═══════════════════════════════════════════════════════
-h1("Roadmap for Sprint 3 (Days 14–15)")
+h1("Roadmap for Sprint 3 (Day 15)")
 
 roadmap_data = [
-    ("Day 14:", "FastAPI NLP Endpoint & Frontend Dual EHR Auto-Sync (integrating NLP outputs with Next.js UI)."),
     ("Day 15:", "Sprint 3 Integration, End-to-End Clinical OPD Trial, & Final Verification."),
 ]
 for day_title, day_desc in roadmap_data:

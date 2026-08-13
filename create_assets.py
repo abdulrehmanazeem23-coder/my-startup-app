@@ -357,6 +357,77 @@ def fig_day13_integration_code():
     path = os.path.join(brain_dir, "day13_integration_code.png")
     img.save(path); print("Saved:", path)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Day 14 Figure 9: src/components/PrescriptionForm.tsx Code
+# ─────────────────────────────────────────────────────────────────────────────
+def fig_day14_prescription_form_code():
+    img, draw = shell_frame(920, 500, "src/components/PrescriptionForm.tsx  —  Auto-Filling Prescription Form UI  [Day 14]")
+    lines = [
+        ("1 ", "export default function PrescriptionForm({ structuredData, rawTranscript, status }: Props) {", BLU),
+        ("2 ", "  const [symptoms, setSymptoms] = useState<string[]>([]);", WHITE),
+        ("3 ", "  const [medications, setMedications] = useState<string[]>([]);", WHITE),
+        ("4 ", "  const [dosageFrequency, setDosageFrequency] = useState<string>('');", WHITE),
+        ("5 ", "  const [duration, setDuration] = useState<string>('');", WHITE),
+        ("6 ", "", WHITE),
+        ("7 ", "  // Auto-Fill Form fields instantly when AI transcription completes", SLATE),
+        ("8 ", "  useEffect(() => {", TEAL),
+        ("9 ", "    if (structuredData && status === 'completed') {", BLU),
+        ("10", "      setSymptoms(structuredData.symptoms || ['General OPD Evaluation']);", GRN),
+        ("11", "      setMedications(structuredData.medications || []);", GRN),
+        ("12", "      setDosageFrequency(structuredData.full_dosage_frequency || 'As Directed');", GRN),
+        ("13", "      setDuration(structuredData.duration || 'Not Specified');", GRN),
+        ("14", "    }", WHITE),
+        ("15", "  }, [structuredData, status]);", TEAL),
+        ("16", "", WHITE),
+        ("17", "  return (", WHITE),
+        ("18", "    <div className='bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl'>", YEL),
+        ("19", "      {/* Interactive Symptoms Tags, DRAP Meds Table, Frequency/Duration Inputs */}", SLATE),
+        ("20", "      {/* Action Toolbar: Copy Prescription, Reset Form, Save to Patient EHR */}", SLATE),
+        ("21", "    </div>", WHITE),
+        ("22", "  );", WHITE),
+        ("23", "}", WHITE),
+    ]
+    y = 44
+    for num, line, col in lines:
+        draw.text((18, y), num, fill=SLATE, font=FONT_MONO)
+        draw.text((52, y), line, fill=col, font=FONT_MONO)
+        y += 16
+    path = os.path.join(brain_dir, "day14_prescription_form_code.png")
+    img.save(path); print("Saved:", path)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Day 14 Figure 10: src/app/page.tsx Integration Code
+# ─────────────────────────────────────────────────────────────────────────────
+def fig_day14_page_integration_code():
+    img, draw = shell_frame(920, 360, "src/app/page.tsx  —  Next.js Prescription Form Workspace Integration  [Day 14]")
+    lines = [
+        ("1 ", "import PrescriptionForm, { StructuredEhrData } from '@/components/PrescriptionForm';", BLU),
+        ("2 ", "", WHITE),
+        ("3 ", "export default function DoctorConsultScreen() {", BLU),
+        ("4 ", "  const [structuredEhr, setStructuredEhr] = useState<StructuredEhrData | null>(null);", WHITE),
+        ("5 ", "  const [transcriptionStatus, setTranscriptionStatus] = useState<TranscriptionStatus>('idle');", WHITE),
+        ("6 ", "", WHITE),
+        ("7 ", "  const handleTranscriptionUpdate = (status, text, structuredData) => {", TEAL),
+        ("8 ", "    setTranscriptionStatus(status);", WHITE),
+        ("9 ", "    if (structuredData) setStructuredEhr(structuredData);  // Receive NLP JSON", GRN),
+        ("10", "  };", WHITE),
+        ("11", "", WHITE),
+        ("12", "  return (", WHITE),
+        ("13", "    <main className='max-w-7xl mx-auto flex flex-col gap-6'>", YEL),
+        ("14", "      <ConsultationRecorder onTranscriptionUpdate={handleTranscriptionUpdate} />", TEAL),
+        ("15", "      <PrescriptionForm structuredData={structuredEhr} status={transcriptionStatus} />", GRN),
+        ("16", "    </main>", YEL),
+        ("17", "  );", WHITE),
+        ("18", "}", WHITE),
+    ]
+    y = 44
+    for num, line, col in lines:
+        draw.text((18, y), num, fill=SLATE, font=FONT_MONO)
+        draw.text((52, y), line, fill=col, font=FONT_MONO)
+        y += 16
+    path = os.path.join(brain_dir, "day14_page_integration_code.png")
+    img.save(path); print("Saved:", path)
+
 fig_day11_regex_code()
 fig_day11_test_console()
 fig_day12_extractor_code()
@@ -365,4 +436,6 @@ fig_day12_main_db_code()
 fig_day13_drap_code()
 fig_day13_test_console()
 fig_day13_integration_code()
-print("\nAll Week 3 (Days 11, 12, & 13) authentic figures generated successfully!")
+fig_day14_prescription_form_code()
+fig_day14_page_integration_code()
+print("\nAll Week 3 (Days 11, 12, 13, & 14) authentic figures generated successfully!")
