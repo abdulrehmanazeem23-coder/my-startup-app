@@ -79,7 +79,11 @@ EXPLICIT_DURATION_MAP = [
     (r"\b(teen\s+hafta|3\s+hafta|three\s+weeks)\b", "21 Days"),
     (r"\b(ek\s+mahina|1\s+mahina|one\s+month|mahina|مہینہ|ایک\s*مہینہ)\b", "30 Days"),
     (r"\b(do\s+mahina|2\s+mahina|two\s+months|دو\s*مہینے)\b", "60 Days"),
-    (r"\b(do\s+din(?:\s+sey|\s+se)?|2\s+din(?:\s+sey|\s+se)?|two\s+days|دو\s*دن)\b", "2 Days"),
+    (r"(?:do\s+din|2\s+din|2\s*دن|دو\s*دن)", "2 Days"),
+    (r"(?:teen\s+din|3\s+din|3\s*دن|تین\s*دن)", "3 Days"),
+    (r"(?:char\s+din|4\s+din|4\s*دن|چار\s*دن)", "4 Days"),
+    (r"(?:paanch\s+din|5\s+din|5\s*دن|پانچ\s*دن)", "5 Days"),
+    (r"(?:saat\s+din|7\s+din|7\s*دن|سات\s*دن)", "7 Days"),
 ]
 
 
@@ -138,7 +142,7 @@ def parse_clinical_text(raw_text: str) -> Dict[str, Optional[str]]:
     # If no explicit duration found, try generic RegEx numerical bounds
     if not duration:
         # Pattern: [number/word] [din|days|hafta|hafte|weeks|mahina|mahine|months]
-        dur_pattern = r"\b(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen)\s*(?:sey|se|for)?\s*(din|days?|hafta|hafte|weeks?|mahina|mahine|months?)\b"
+        dur_pattern = r"\b(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen)\s*(?:sey|se|for|ke\s+liye|kay\s+liye)?\s*(din|days?|hafta|hafte|weeks?|mahina|mahine|months?)\b"
         match = re.search(dur_pattern, text_lower, re.IGNORECASE)
         if match:
             num_str, unit_str = match.group(1), match.group(2)
