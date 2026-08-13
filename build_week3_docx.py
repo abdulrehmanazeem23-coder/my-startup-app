@@ -130,9 +130,9 @@ doc.add_page_break()
 # EXECUTIVE SUMMARY
 # ═══════════════════════════════════════════════════════
 h1("Executive Summary")
-body("Sprint 3 (Days 11–15) focuses on Natural Language Processing (NLP), clinical entity extraction, DRAP catalog fuzzy validation, automated EHR JSON note generation, and interactive frontend prescription UI integration. Day 11 established the RegEx mapping engine. Day 12 built the Symptom & Medication Entity Extractor module. Day 13 implemented the DRAP Medicine Catalog Fallback Validator. Day 14 creates the interactive auto-filling React prescription form UI in Next.js.")
+body("Sprint 3 (Days 11–15) focuses on Natural Language Processing (NLP), clinical entity extraction, DRAP catalog fuzzy validation, phonetic auto-correction, automated EHR JSON note generation, and interactive frontend prescription UI integration. Day 11 established the RegEx mapping engine. Day 12 built the Symptom & Medication Entity Extractor. Day 13 implemented the DRAP Medicine Catalog Fallback Validator. Day 14 creates the interactive auto-filling React prescription form UI in Next.js and the Clinical Phonetic Auto-Corrector Engine.")
 callout(
-    "Days 11, 12, 13 & 14 are 100% complete and verified. The Next.js frontend now features an interactive PrescriptionForm component connected to the FastAPI Whisper & DRAP NLP pipeline. Upon audio recording completion, chief complaints, DRAP-validated medications, dosage frequency, and duration instantly auto-fill into clean, editable clinical fields.",
+    "Days 11, 12, 13 & 14 are 100% complete and verified. The system includes a Phonetic Auto-Corrector engine that auto-corrects speech typos ('penadol', 'punadol', 'پینادول' -> 'Panadol') and auto-fills prescription fields in real time.",
     "Sprint 3 Status:"
 )
 
@@ -248,7 +248,7 @@ figure("day13_test_console.png", "Figure 8: test_drap_validator.py authentic ter
 # ═══════════════════════════════════════════════════════
 # DAY 14
 # ═══════════════════════════════════════════════════════
-h1("Day 14 Implementation: Interactive Auto-Filling Prescription Form UI")
+h1("Day 14 Implementation: Interactive Prescription UI & Phonetic Auto-Corrector Engine")
 
 h2("Interactive Prescription Form Component")
 body("A new React component src/components/PrescriptionForm.tsx was designed with a modern, clinical dark slate & emerald theme. The component accepts structuredData and status as props. An internal useEffect hook automatically populates form fields instantly upon AI transcription completion:")
@@ -270,9 +270,10 @@ for title, desc in bullet_data_14:
 
 figure("day14_prescription_form_code.png", "Figure 9: src/components/PrescriptionForm.tsx — React interactive auto-filling prescription form implementation")
 
-h2("Next.js Workspace Integration")
-body("ConsultationRecorder.tsx and src/app/page.tsx were updated. When task status polling receives status 'completed', statusData.structured_ehr is passed to the parent page state and fed directly into PrescriptionForm. The doctor workspace UI automatically displays the auto-filled prescription form right below the voice recorder.")
-figure("day14_page_integration_code.png", "Figure 10: src/app/page.tsx — Doctor workspace integrating ConsultationRecorder and PrescriptionForm UI")
+h2("Phonetic Clinical Auto-Corrector Engine (backend/nlp/autocorrect.py)")
+body("To handle noisy speech audio and phonetic misspellings (e.g. 'penadol', 'punadol', 'پینادول'), a dedicated Phonetic Auto-Corrector Engine was implemented at backend/nlp/autocorrect.py. Before passing speech transcripts to NLP entity extractors, autocorrect_transcript() applies rule-based phonetic rules and token-by-token DRAP catalog Levenshtein fuzzy matching (threshold >= 75%) to automatically transform speech typos into official clinical names.")
+
+figure("day14_autocorrect_code.png", "Figure 10: backend/nlp/autocorrect.py — Phonetic auto-corrector engine fixing speech typos (penadol/punadol -> Panadol)")
 
 # ═══════════════════════════════════════════════════════
 # ROADMAP
