@@ -17,7 +17,7 @@ from database import engine, Base, get_db, SessionLocal
 import models
 from ai.audio_processor import sanitize_audio
 from ai.whisper_service import WhisperTranscriber
-from nlp.entity_extractor import extract_full_prescription
+from nlp import extract_full_prescription, autocorrect_transcript
 
 # Auto-create & migrate database tables
 Base.metadata.create_all(bind=engine)
@@ -131,7 +131,11 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
         print(f"{'=' * 55}")
         print("")
 
-        transcribed_text = transcription_res.get("text", "")
+        raw_whisper_text = transcription_res.get("text", "")
+        # Apply Clinical Phonetic Auto-Corrector (fixes penadol/punadol/ Urdu phonetics -> Panadol)
+        transcribed_text = autocorrect_transcript(raw_whisper_text)
+        print(f"[ShifaScribe Auto-Correct] Raw Whisper : '{raw_whisper_text}'")
+        print(f"[ShifaScribe Auto-Correct] Clean Result: '{transcribed_text}'")
 
         # ── Step 4: Day 12 NLP Entity Extraction ───────────────────────────
         structured_ehr = extract_full_prescription(transcribed_text)
