@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { StructuredEhrData } from "./PrescriptionForm";
 
 export type RecordingState = "idle" | "recording" | "processing";
 export type TranscriptionStatus =
@@ -12,7 +12,11 @@ export type TranscriptionStatus =
 
 interface ConsultationRecorderProps {
   onStateChange?: (state: RecordingState) => void;
-  onTranscriptionUpdate?: (status: TranscriptionStatus, text: string) => void;
+  onTranscriptionUpdate?: (
+    status: TranscriptionStatus,
+    text: string,
+    structuredData?: StructuredEhrData | null
+  ) => void;
 }
 
 const BACKEND_URL = "http://localhost:8000";
@@ -70,11 +74,15 @@ export default function ConsultationRecorder({
     }
   };
 
-  const updateTranscription = (status: TranscriptionStatus, text: string) => {
+  const updateTranscription = (
+    status: TranscriptionStatus,
+    text: string,
+    structuredData?: StructuredEhrData | null
+  ) => {
     setTranscriptionStatus(status);
     setTranscriptionText(text);
     if (onTranscriptionUpdate) {
-      onTranscriptionUpdate(status, text);
+      onTranscriptionUpdate(status, text, structuredData);
     }
   };
 
@@ -145,10 +153,12 @@ export default function ConsultationRecorder({
             clearInterval(pollingIntervalRef.current!);
             pollingIntervalRef.current = null;
             const finalText = statusData.text || "(No text returned)";
-            updateTranscription("completed", finalText);
+            const structuredData: StructuredEhrData | null = statusData.structured_ehr || null;
+            updateTranscription("completed", finalText, structuredData);
             setUploadProgress("");
             console.log(
-              `[ShifaScribe Day 9] Transcription complete: "${finalText}"`
+              `[ShifaScribe Day 14] Transcription & NLP complete: "${finalText}"`,
+              structuredData
             );
           } else if (currentStatus === "failed") {
             clearInterval(pollingIntervalRef.current!);
