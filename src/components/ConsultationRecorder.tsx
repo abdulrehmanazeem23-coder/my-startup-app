@@ -169,11 +169,11 @@ export default function ConsultationRecorder({
               statusData.error || "Transcription failed."
             );
             setUploadProgress("");
-          } else if (pollCount >= 60) {
-            // Timeout after 2 minutes
+          } else if (pollCount >= 120) {
+            // Timeout after 3 minutes
             clearInterval(pollingIntervalRef.current!);
             pollingIntervalRef.current = null;
-            updateTranscription("failed", "Transcription timed out after 2 minutes.");
+            updateTranscription("failed", "Transcription timed out after 3 minutes.");
             setUploadProgress("");
           }
         } catch (pollErr) {

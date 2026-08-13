@@ -47,6 +47,12 @@ app = FastAPI(
     version="0.4.0",
 )
 
+@app.on_event("startup")
+async def startup_event():
+    print("[ShifaScribe Startup] Pre-warming Whisper AI model in memory...")
+    get_transcriber_instance()
+    print("[ShifaScribe Startup] Whisper AI model pre-warmed and ready for instant inference!")
+
 # CORS Middleware configuration
 origins = [
     "http://localhost:3000",
