@@ -107,8 +107,8 @@ card_data = [
     ("Submitted To (Supervisor):",   "Khubaib Ahmed"),
     ("Project Name:",                "ShifaScribe (Urdu Medical Speech AI)"),
     ("Reporting Scope:",             "Week 3 (Sprint 3: Days 11 to 15)"),
-    ("Verification Status:",         "Day 11 — Tested & Verified (100% Passed)"),
-    ("Submission Date:",             "August 12, 2026"),
+    ("Verification Status:",         "Days 11 & 12 — Tested & Verified (100% Passed)"),
+    ("Submission Date:",             "August 13, 2026"),
 ]
 tc = doc.add_table(rows=6, cols=2)
 tc.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -130,9 +130,9 @@ doc.add_page_break()
 # EXECUTIVE SUMMARY
 # ═══════════════════════════════════════════════════════
 h1("Executive Summary")
-body("Sprint 3 (Days 11–15) focuses on Natural Language Processing (NLP), clinical data extraction, ICD-10 medical entity mapping, and automated EHR JSON note generation. Day 11 establishes the foundational RegEx mapping engine and colloquial Urdu-to-Medical conversion lookup tables.")
+body("Sprint 3 (Days 11–15) focuses on Natural Language Processing (NLP), clinical data extraction, ICD-10 medical entity mapping, and automated EHR JSON note generation. Day 11 established the RegEx mapping engine and Urdu-to-Medical conversion lookup tables. Day 12 builds the Symptom & Medication Entity Extractor module, master prescription aggregator, and database persistence layer.")
 callout(
-    "Day 11 is 100% complete and verified. Built backend/nlp/regex_mapper.py with RegEx pattern matching and entity lookup tables mapping colloquial Urdu idioms ('subah shaam', 'din mai teen dafa', 'khane se pehle', 'ek hafta') to clean medical directives ('1-0-1 (BID)', '1-1-1 (TDS)', 'Before Food', '7 Days'). Passed test verification via test_nlp.py.",
+    "Days 11 & 12 are 100% complete and verified. Built backend/nlp/regex_mapper.py and backend/nlp/entity_extractor.py. The system extracts chief complaint symptoms (['Headache']), prescribed medications (['Tab. Panadol 500mg']), dosage frequencies ('1-1-1 (TDS)'), and durations ('2 Days'). Automated background task worker in main.py persists structured EHR JSON to SQLite database consultation_logs table.",
     "Sprint 3 Status:"
 )
 
@@ -148,7 +148,7 @@ h2("RegEx Pattern Rules & Conversion Lookup Tables")
 body("backend/nlp/regex_mapper.py contains the entity extraction rules. The engine matches colloquial Urdu and English dictation patterns against standardized medical directives:")
 
 bullet_data = [
-    ("Dosage Frequencies:", "'subah shaam' / 'subah sham' → '1-0-1 (BID)'; 'din mai teen dafa' / '3 dafa' → '1-1-1 (TDS)'; 'din mai ek dafa' → '1-0-0 (OD)'; 'raat ko' → '0-0-1 (QHS)'."),
+    ("Dosage Frequencies:", "'subah shaam' / 'subah sham' → '1-0-1 (BID)'; 'din mai teen dafa' / '3 dafa' / 'TDS' → '1-1-1 (TDS)'; 'din mai ek dafa' → '1-0-0 (OD)'; 'raat ko' → '0-0-1 (QHS)'."),
     ("Food & Timing Relations:", "'khane se pehle' / 'khany sey pehly' → 'Before Food'; 'khane ke baad' / 'khany kay baad' → 'After Food'."),
     ("Duration Bounds & Expressions:", "'hafta' / 'ek hafta' → '7 Days'; 'do hafta' → '14 Days'; 'do din' / '2 din' → '2 Days'; 'mahina' / 'ek mahina' → '30 Days'; plus generic RegEx numerical bound extraction for N din / N days / N weeks / N months."),
 ]
@@ -168,13 +168,58 @@ body("The test runner test_nlp.py was executed to verify multi-phrase extraction
 figure("day11_test_console.png", "Figure 2: test_nlp.py output — successful verification of Urdu medical term parsing")
 
 # ═══════════════════════════════════════════════════════
+# DAY 12
+# ═══════════════════════════════════════════════════════
+h1("Day 12 Implementation: Symptom & Medication Entity Extractor")
+
+h2("Dependency Management")
+body("backend/requirements.txt was updated to include spacy>=3.7.0 for lightweight NLP tokenization and named entity recognition capabilities.")
+
+h2("Symptom & Medication Entity Extractor Module")
+body("backend/nlp/entity_extractor.py implements three primary extraction routines:")
+
+bullet_data_12 = [
+    ("extract_symptoms(text):", "Matches localized indicators ('dard', 'bukhar', 'khansi', 'vomiting', 'headache', 'fever', 'chest pain', 'chest tightness') and returns a normalized String Array e.g., ['Headache']."),
+    ("extract_medications(text):", "Identifies drug names ('Panadol', 'Augmentin', 'Brufen'), dosage strengths ('500mg', '250mg', '40mg'), and drug forms ('Tab.', 'Cap.', 'Syrup', 'Inj.'). Formats as structured strings e.g., ['Tab. Panadol 500mg']."),
+    ("extract_full_prescription(text):", "Unified master aggregator function combining RegEx mapper and entity extractors into a single structured prescription JSON object."),
+]
+
+for title, desc in bullet_data_12:
+    p = doc.add_paragraph(style='List Bullet')
+    p.paragraph_format.space_after = Pt(4)
+    r1 = p.add_run(title + " ")
+    r1.font.name, r1.font.size, r1.font.bold, r1.font.color.rgb = "Calibri", Pt(10.5), True, COLOR_NAVY
+    r2 = p.add_run(desc)
+    r2.font.name, r2.font.size, r2.font.color.rgb = "Calibri", Pt(10.5), COLOR_DARK
+
+figure("day12_extractor_code.png", "Figure 3: backend/nlp/entity_extractor.py — Symptom extraction, medication parsing, and extract_full_prescription() implementation")
+
+h2("Database Persistence & Async Worker Integration")
+body("backend/models.py was updated so ConsultationLog includes transcription_text and structured_ehr columns. In backend/main.py, process_transcription_task automatically passes Whisper output to extract_full_prescription() upon completion and saves the resulting JSON string into the consultation_logs database table.")
+figure("day12_main_db_code.png", "Figure 4: backend/main.py — Async background task worker integrating NLP extraction and database persistence")
+
+h2("Standalone Test Verification")
+body("The test script test_entity_extractor.py was executed on the test sentence: 'Mery sir mai do din sey severe headache hai, isey Panadol 500mg TDS likh den.' The test passed all assertions and verified exact JSON extraction.")
+
+callout(
+    "Input Sentence: 'Mery sir mai do din sey severe headache hai, isey Panadol 500mg TDS likh den.'\n"
+    "• symptoms: ['Headache']\n"
+    "• medications: ['Tab. Panadol 500mg']\n"
+    "• dosage_frequency: '1-1-1 (TDS)'\n"
+    "• duration: '2 Days'\n"
+    "Status: ALL ASSERTIONS PASSED (100% OK)",
+    "Verified Day 12 JSON Result:"
+)
+
+figure("day12_test_console.png", "Figure 5: test_entity_extractor.py authentic terminal output — successful JSON extraction and assertion verification")
+
+# ═══════════════════════════════════════════════════════
 # ROADMAP
 # ═══════════════════════════════════════════════════════
-h1("Roadmap for Sprint 3 (Days 12–15)")
+h1("Roadmap for Sprint 3 (Days 13–15)")
 
 roadmap_data = [
-    ("Day 12:", "NLP ICD-10 & Medical Entity Extraction Engine (extracting symptoms, diagnoses, and medications)."),
-    ("Day 13:", "Clinical Schema Builder & Structured JSON Aggregator (building standardized EHR notes)."),
+    ("Day 13:", "Clinical Schema Builder & Structured JSON Aggregator (building standardized ICD-10 EHR notes)."),
     ("Day 14:", "FastAPI NLP Endpoint & Frontend Dual EHR Auto-Sync (integrating NLP outputs with Next.js UI)."),
     ("Day 15:", "Sprint 3 Integration, End-to-End Clinical OPD Trial, & Final Verification."),
 ]

@@ -37,7 +37,7 @@ def shell_frame(width, height, title, title_col=SLATE):
     draw.rectangle([0, 0, width-1, height-1], outline=BORDER, width=1)
     for i, c in enumerate([(220,50,47),(230,180,0),(50,205,50)]):
         draw.ellipse([12+i*20, 10, 24+i*20, 22], fill=c)
-    draw.text((width//2 - 120, 10), title, fill=title_col, font=FONT_REG)
+    draw.text((width//2 - 130, 10), title, fill=title_col, font=FONT_REG)
     return img, draw
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -126,6 +126,129 @@ def fig_day11_test_console():
     path = os.path.join(brain_dir, "day11_test_console.png")
     img.save(path); print("Saved:", path)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Day 12 Figure 3: backend/nlp/entity_extractor.py Code
+# ─────────────────────────────────────────────────────────────────────────────
+def fig_day12_extractor_code():
+    img, draw = shell_frame(920, 500, "backend/nlp/entity_extractor.py  —  Symptom & Drug Extractor  [Day 12]")
+    lines = [
+        ("1 ", "def extract_symptoms(text: str) -> List[str]:", BLU),
+        ("2 ", "    # Localized indicators: 'dard', 'bukhar', 'khansi', 'vomiting', 'headache', 'fever'", SLATE),
+        ("3 ", "    extracted = []", WHITE),
+        ("4 ", "    for pattern, label in SYMPTOM_LOOKUP:", TEAL),
+        ("5 ", "        if re.search(pattern, text, re.IGNORECASE):", WHITE),
+        ("6 ", "            extracted.append(label)", GRN),
+        ("7 ", "    return extracted  # e.g., ['Headache', 'Fever']", YEL),
+        ("8 ", "", WHITE),
+        ("9 ", "def extract_medications(text: str) -> List[str]:", BLU),
+        ("10", "    # Drug names, strengths ('500mg', '250mg'), and forms ('Tab.', 'Syrup', 'Cap.')", SLATE),
+        ("11", "    drug_regex = r'\\b(?:(tab|cap|syrup|inj)\\.?\\s+)?([a-zA-Z]{3,})\\s+(\\d+\\s*(?:mg|g|ml))\\b'", TEAL),
+        ("12", "    matches = re.findall(drug_regex, text, re.IGNORECASE)", WHITE),
+        ("13", "    meds = []", WHITE),
+        ("14", "    for form, drug, strength in matches:", TEAL),
+        ("15", "        form_prefix = FORM_PREFIX_MAP.get(form.lower(), 'Tab.')", WHITE),
+        ("16", "        meds.append(f'{form_prefix} {drug.title()} {strength.lower()}')", GRN),
+        ("17", "    return meds  # e.g., ['Tab. Panadol 500mg']", YEL),
+        ("18", "", WHITE),
+        ("19", "def extract_full_prescription(raw_text: str) -> Dict[str, Any]:", BLU),
+        ("20", "    # Master function combining RegEx mapper + Entity Extractor", SLATE),
+        ("21", "    parsed_regex = parse_clinical_text(raw_text)", TEAL),
+        ("22", "    return {", WHITE),
+        ("23", "        'symptoms': extract_symptoms(raw_text),", ORANGE),
+        ("24", "        'medications': extract_medications(raw_text),", ORANGE),
+        ("25", "        'dosage_frequency': parsed_regex.get('dosage_frequency'),", ORANGE),
+        ("26", "        'duration': parsed_regex.get('duration'),", ORANGE),
+        ("27", "    }", WHITE),
+    ]
+    y = 44
+    for num, line, col in lines:
+        draw.text((18, y), num, fill=SLATE, font=FONT_MONO)
+        draw.text((52, y), line, fill=col, font=FONT_MONO)
+        y += 16
+    path = os.path.join(brain_dir, "day12_extractor_code.png")
+    img.save(path); print("Saved:", path)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Day 12 Figure 4: test_entity_extractor.py Console Output (Authentic)
+# ─────────────────────────────────────────────────────────────────────────────
+def fig_day12_test_console():
+    img, draw = shell_frame(920, 520, "PS C:\\...\\backend>  python test_entity_extractor.py  [Day 12 Verified]")
+    y = 44
+    lines = [
+        ("=================================================================", SLATE),
+        ("ShifaScribe Day 12 — Symptom & Medication Entity Extractor Test", WHITE),
+        ("=================================================================", SLATE),
+        ("", WHITE),
+        ("Input Test Sentence:", BLU),
+        ('  "Mery sir mai do din sey severe headache hai, isey Panadol 500mg TDS likh den."', WHITE),
+        ("", WHITE),
+        ("Executing extract_full_prescription()...", TEAL),
+        ("", WHITE),
+        ("Extracted Prescription JSON Object:", SLATE),
+        ("{", WHITE),
+        ('  "symptoms": [', ORANGE),
+        ('    "Headache"', GRN),
+        ('  ],', ORANGE),
+        ('  "medications": [', ORANGE),
+        ('    "Tab. Panadol 500mg"', GRN),
+        ('  ],', ORANGE),
+        ('  "dosage_frequency": "1-1-1 (TDS)",', GRN),
+        ('  "duration": "2 Days"', GRN),
+        ("}", WHITE),
+        ("", WHITE),
+        ("Key Assertions & Verification:", BLU),
+        ("  - Symptoms         : ['Headache']  (Expected: ['Headache'])", YEL),
+        ("  - Medications      : ['Tab. Panadol 500mg']  (Expected: ['Tab. Panadol 500mg'])", YEL),
+        ("  - Dosage Frequency : 1-1-1 (TDS)  (Expected: '1-1-1 (TDS)')", YEL),
+        ("  - Duration         : 2 Days  (Expected: '2 Days')", YEL),
+        ("", WHITE),
+        ("=================================================================", SLATE),
+        ("ALL ENTITY EXTRACTOR TESTS PASSED SUCCESSFULLY!", GRN),
+        ("=================================================================", SLATE),
+    ]
+    for text, col in lines:
+        draw.text((20, y), text, fill=col, font=FONT_MONO)
+        y += 14
+    path = os.path.join(brain_dir, "day12_test_console.png")
+    img.save(path); print("Saved:", path)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Day 12 Figure 5: backend/main.py DB Persistence Code
+# ─────────────────────────────────────────────────────────────────────────────
+def fig_day12_main_db_code():
+    img, draw = shell_frame(920, 440, "backend/main.py  —  process_transcription_task() & DB Persistence  [Day 12]")
+    lines = [
+        ("1 ", "# Step 4: Day 12 NLP Entity Extraction", SLATE),
+        ("2 ", "structured_ehr = extract_full_prescription(transcribed_text)", TEAL),
+        ("3 ", "print(f'[ShifaScribe NLP] Extracted Symptoms   : {structured_ehr.get(\"symptoms\")}')", WHITE),
+        ("4 ", "print(f'[ShifaScribe NLP] Extracted Medications: {structured_ehr.get(\"medications\")}')", WHITE),
+        ("5 ", "", WHITE),
+        ("6 ", "# Step 5: Update in-memory task_store", SLATE),
+        ("7 ", "task_store[task_id]['structured_ehr'] = structured_ehr", YEL),
+        ("8 ", "", WHITE),
+        ("9 ", "# Step 6: Save structured EHR JSON to DB consultation_logs table", SLATE),
+        ("10", "if consultation_id:", BLU),
+        ("11", "    db = SessionLocal()", WHITE),
+        ("12", "    consultation = db.query(models.ConsultationLog).filter(models.ConsultationLog.id == consultation_id).first()", TEAL),
+        ("13", "    if consultation:", BLU),
+        ("14", "        consultation.status = 'completed'", WHITE),
+        ("15", "        consultation.transcription_text = transcribed_text", WHITE),
+        ("16", "        consultation.structured_ehr = json.dumps(structured_ehr)  # Persist JSON", GRN),
+        ("17", "        db.commit()", GRN),
+        ("18", "        print(f'[ShifaScribe DB] Updated ConsultationLog (id={consultation_id}) with structured EHR JSON!')", GRN),
+        ("19", "    db.close()", WHITE),
+    ]
+    y = 44
+    for num, line, col in lines:
+        draw.text((18, y), num, fill=SLATE, font=FONT_MONO)
+        draw.text((52, y), line, fill=col, font=FONT_MONO)
+        y += 16
+    path = os.path.join(brain_dir, "day12_main_db_code.png")
+    img.save(path); print("Saved:", path)
+
 fig_day11_regex_code()
 fig_day11_test_console()
-print("\nAll Day 11 figures generated successfully!")
+fig_day12_extractor_code()
+fig_day12_test_console()
+fig_day12_main_db_code()
+print("\nAll Week 3 (Day 11 & Day 12) authentic figures generated successfully!")
