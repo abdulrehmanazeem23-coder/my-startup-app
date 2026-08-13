@@ -19,8 +19,27 @@ from ai.audio_processor import sanitize_audio
 from ai.whisper_service import WhisperTranscriber
 from nlp.entity_extractor import extract_full_prescription
 
-# Auto-create database tables
+# Auto-create & migrate database tables
 Base.metadata.create_all(bind=engine)
+
+def ensure_db_columns():
+    """Safety migration helper to ensure new columns exist in SQLite database."""
+    try:
+        with engine.connect() as conn:
+            from sqlalchemy import text
+            result = conn.execute(text("PRAGMA table_info(consultation_logs);")).fetchall()
+            existing_cols = [row[1] for row in result]
+            if "transcription_text" not in existing_cols:
+                conn.execute(text("ALTER TABLE consultation_logs ADD COLUMN transcription_text TEXT;"))
+                print("[ShifaScribe DB Migration] Added 'transcription_text' column to consultation_logs!")
+            if "structured_ehr" not in existing_cols:
+                conn.execute(text("ALTER TABLE consultation_logs ADD COLUMN structured_ehr TEXT;"))
+                print("[ShifaScribe DB Migration] Added 'structured_ehr' column to consultation_logs!")
+            conn.commit()
+    except Exception as err:
+        print(f"[ShifaScribe DB Migration Info] Column check: {err}")
+
+ensure_db_columns()
 
 app = FastAPI(
     title="ShifaScribe AI Medical Scribe API",
