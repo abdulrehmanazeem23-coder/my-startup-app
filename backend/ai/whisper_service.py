@@ -111,13 +111,10 @@ class WhisperTranscriber:
                 else:
                     input_features = input_features.to(dtype=torch.float32)
 
-                # Configure forced decoder tokens only if explicit language is requested
+                # Standard Whisper generation parameters (no false silence rejection thresholds)
                 gen_kwargs = {
                     "num_beams": 5,
                     "temperature": 0.0,
-                    "compression_ratio_threshold": 2.4,
-                    "logprob_threshold": -1.0,
-                    "no_speech_threshold": 0.6,
                 }
 
                 if language:
