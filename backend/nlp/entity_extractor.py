@@ -17,7 +17,7 @@ from .drap_validator import validate_medication
 
 SYMPTOM_LOOKUP = [
     # Headache / Head pain
-    (r"\b(headache|sir\s*(?:mai|mein)?\s*dard|head\s+pain|sir\s+dard|سویئر\s*ہیڈک|ہیڈک|ہیڈیک|سر\s*میں\s*درد)\b", "Headache"),
+    (r"\b(headache|sir\s*(?:mai|mein)?\s*dard|head\s+pain|sir\s+dard|سویئر\s*ہیڈک|ہیڈک|ہیڈیک|سر\s*میں\s*درد|سردرد|سر\s+درد)\b", "Headache"),
     # Chest pain
     (r"\b(chest\s+pain|sine\s*(?:mai|mein)?\s*dard|seene\s*(?:mai|mein)?\s*dard)\b", "Chest Pain"),
     # Chest tightness
@@ -201,7 +201,7 @@ def extract_clinical_notes(text: str) -> str:
         unit_clean = "days" if any(u in raw_unit for u in ["din", "day", "دین", "دن"]) else ("weeks" if any(u in raw_unit for u in ["haft", "week", "ہفت"]) else "months")
         return f"Follow-up recheckup advised after {num_clean} {unit_clean}."
 
-    if any(k in t for k in ["dobara", "recheckup", "re-checkup", "checkup", "visit", "چیکپ", "وزٹ", "چیکٹ", "دوارہ|چکپ"]):
+    if any(k in t for k in ["dobara", "recheckup", "re-checkup", "checkup", "visit", "چیکپ", "وزٹ", "چیکٹ", "دوارہ", "چکپ"]):
         return "Follow-up OPD recheckup advised."
 
     return "Standard OPD Follow-up & Care."

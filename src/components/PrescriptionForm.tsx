@@ -9,6 +9,7 @@ export interface StructuredEhrData {
   duration?: string;
   food_relation?: string | null;
   full_dosage_frequency?: string | null;
+  clinical_notes?: string;
   raw_input?: string;
 }
 

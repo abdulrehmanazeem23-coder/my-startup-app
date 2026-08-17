@@ -113,8 +113,8 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
         inference_start = time.time()
 
         ai_engine = get_transcriber_instance()
-        # language=None enables auto-detection for code-switched (Urdu + English) dictation
-        transcription_res = ai_engine.transcribe_audio(target_audio_path, language=None)
+        # Force Urdu transcription for consistent output — autocorrect pipeline handles English conversion
+        transcription_res = ai_engine.transcribe_audio(target_audio_path, language="ur")
 
         inference_elapsed = round(time.time() - inference_start, 3)
         print(f"[PERF] Whisper inference completed in {inference_elapsed:.3f}s")
