@@ -24,7 +24,7 @@ CLINICAL_AUTOCORRECT_RULES = [
     (r"\b(paracetmol|paracetamal|parasitamol|پیراسیٹامول|پراسیٹامول)\b", "Paracetamol"),
     (r"\b(brofen|bruffen|bruphen|بروفن|بروفین|ابروفن)\b", "Brufen"),
     (r"\b(ibuprofen|ibrufen)\b", "Ibuprofen"),
-    (r"\b(augmenten|aggmentin|ogmentin|اگمنٹن|اگمنٹین|اگمینٹن|اگمینٹین|اسکا\s*بم|اسکھابم|اسکابم)\b", "Augmentin"),
+    (r"\b(augmenten|aggmentin|ogmentin|اوگمینٹن|اوگمنٹن|اوگمنٹین|اگمنٹن|اگمنٹین|اگمینٹن|اگمینٹین|اسکا\s*بم|اسکھابم|اسکابم)\b", "Augmentin"),
     (r"\b(ponsten|ponstaan|پونسٹان|پونسٹین|پونستان)\b", "Ponstan"),
     (r"\b(dispren|desprin|ڈسپرین)\b", "Disprin"),
     (r"\b(flygyl|flgyl|flagil|فلیجل|فلائیجل)\b", "Flagyl"),
@@ -39,8 +39,8 @@ CLINICAL_AUTOCORRECT_RULES = [
     (r"(\d+)\s*(?:ملی\s*لیٹر|ایم\s*ایل)\b", r"\1ml"),
 
     # ── 3. Urdu Script Frequencies & Directives ──────────────────────────
-    (r"\b(تیڈیل|ٹی\s*ڈی\s*ایس|ٹیڈیل|تین\s+دفعہ|تین\s*ٹائم|تین\s*ٹائمز|۳\s*ٹائم|3\s*times?|تیڈیل\s+کی\s+دوزیج|ڈیل|ڈیڈیل)\b", "TDS"),
-    (r"\b(بی\s*آئی\s*ڈی|بی\s*ڈی|صبح\s+شام|دو\s*ٹائم|دو\s*ٹائمز|۲\s*ٹائم|2\s*times?)\b", "BID"),
+    (r"\b(تیڈیل|ٹی\s*ڈی\s*ایس|ٹیڈیل|تین\s+دفعہ|تین\s*ٹائم|تین\s*ٹائمز|تین\s*طائم|تین\s*طائمز|۳\s*ٹائم|۳\s*طائم|3\s*times?|تیڈیل\s+کی\s+دوزیج|ڈیل|ڈیڈیل)\b", "TDS"),
+    (r"\b(بی\s*آئی\s*ڈی|بی\s*ڈی|صبح\s+شام|دو\s*ٹائم|دو\s*ٹائمز|دو\s*طائم|دو\s*طائمز|۲\s*ٹائم|۲\s*طائم|2\s*times?)\b", "BID"),
     (r"\b(او\s*ڈی|ایک\s+دفعہ|ایک\s*ٹائم|ایک\s*ٹائمز|روزانہ)\b", "OD"),
     (r"\b(کیو\s*ایچ\s*ایس|راات\s*کو|رات\s*کو)\b", "QHS"),
 
