@@ -165,23 +165,53 @@ def extract_medications(text: str) -> List[str]:
     return medications
 
 
+WORD_NUM_MAP = {
+    'ek': '1', 'one': '1', 'do': '2', 'two': '2', 'teen': '3', 'three': '3', 'char': '4', 'chahr': '4', 'four': '4',
+    'paanch': '5', 'panch': '5', 'five': '5', 'chhe': '6', 'che': '6', 'six': '6', 'saat': '7', 'seven': '7',
+    'aath': '8', 'eight': '8', 'nau': '9', 'nine': '9', 'das': '10', 'ten': '10', 'pandrah': '15', 'fifteen': '15',
+    'ایک': '1', 'دو': '2', 'تین': '3', 'چار': '4', 'پانچ': '5', 'چھ': '6', 'سات': '7', 'آٹھ': '8', 'نو': '9', 'دس': '10'
+}
+
+
+def extract_clinical_notes(text: str) -> str:
+    """
+    Extracts doctor clinical advice, precautions, and follow-up recheckup instructions
+    from clinical audio dictation (e.g. 'Patient should come for a recheckup after 7 days' -> 'Follow-up recheckup advised after 7 days.').
+    """
+    if not text or not isinstance(text, str):
+        return "Standard OPD Follow-up & Care."
+
+    t = text.lower()
+
+    # Pattern A: [number/word] [days/din] ... [recheckup/dobara/visit]
+    mA = re.search(
+        r"(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen|ایک|دو|تین|چار|پانچ|سات)\s*(din|days?|hafte|weeks?|mahina|months?|دین|دن)\s*(?:[^\w\s]+\s*|\w+\s+){0,5}(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ)",
+        t
+    )
+    # Pattern B: [recheckup/dobara/visit] ... [number/word] [days/din]
+    mB = re.search(
+        r"(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ)\s*(?:[^\w\s]+\s*|\w+\s+){0,5}(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen|ایک|دو|تین|چار|پانچ|سات)\s*(din|days?|hafte|weeks?|mahina|months?|دین|دن)",
+        t
+    )
+
+    m = mA or mB
+    if m:
+        raw_num, raw_unit = m.group(1), m.group(2)
+        num_clean = WORD_NUM_MAP.get(raw_num, raw_num)
+        unit_clean = "days" if any(u in raw_unit for u in ["din", "day", "دین", "دن"]) else ("weeks" if any(u in raw_unit for u in ["haft", "week", "ہفت"]) else "months")
+        return f"Follow-up recheckup advised after {num_clean} {unit_clean}."
+
+    if any(k in t for k in ["dobara", "recheckup", "re-checkup", "checkup", "visit", "چیکپ", "وزٹ", "چیکٹ"]):
+        return "Follow-up OPD recheckup advised."
+
+    return "Standard OPD Follow-up & Care."
+
+
 def extract_full_prescription(raw_text: str) -> Dict[str, Any]:
     """
     Master NLP Extraction Function:
     Combines RegEx duration/frequency mapper with Symptom & Medication entity extractors
     and validates all extracted drug names against the official DRAP medicine catalog via fuzzy matching.
-
-    Args:
-        raw_text (str): Transcribed patient dictation string.
-
-    Returns:
-        Dict[str, Any]: Unified structured prescription JSON containing:
-            - 'symptoms': list[str]
-            - 'medications': list[str]
-            - 'dosage_frequency': str
-            - 'duration': str
-            - 'food_relation': Optional[str]
-            - 'raw_input': str
     """
     parsed_regex = parse_clinical_text(raw_text)
     symptoms = extract_symptoms(raw_text)
@@ -194,6 +224,8 @@ def extract_full_prescription(raw_text: str) -> Dict[str, Any]:
         if validated and validated not in validated_medications:
             validated_medications.append(validated)
 
+    clinical_notes = extract_clinical_notes(raw_text)
+
     return {
         "symptoms": symptoms,
         "medications": validated_medications,
@@ -201,5 +233,6 @@ def extract_full_prescription(raw_text: str) -> Dict[str, Any]:
         "duration": parsed_regex.get("duration", "Not Specified"),
         "food_relation": parsed_regex.get("food_relation"),
         "full_dosage_frequency": parsed_regex.get("full_dosage_frequency"),
+        "clinical_notes": clinical_notes,
         "raw_input": raw_text or "",
     }

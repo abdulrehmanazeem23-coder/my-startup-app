@@ -58,6 +58,9 @@ export default function PrescriptionForm({
       );
 
       setDuration(structuredData.duration || "Not Specified");
+      if (structuredData.clinical_notes) {
+        setClinicalNotes(structuredData.clinical_notes);
+      }
       setSavedStatus(false);
     }
   }, [structuredData, status]);
@@ -117,7 +120,7 @@ ${clinicalNotes || "Standard OPD Follow-up"}
 [RAW URDU TRANSCRIPT]
 "${rawTranscript || "N/A"}"
 ========================================
-    `.strip();
+    `.trim();
 
     navigator.clipboard.writeText(formatted);
     setCopied(true);
