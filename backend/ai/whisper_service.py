@@ -4,6 +4,7 @@ import os
 os.environ["TQDM_DISABLE"] = "1"
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 
+import re
 import torch
 import librosa
 import numpy as np
@@ -17,6 +18,37 @@ WHISPER_N_SAMPLES    = WHISPER_SAMPLE_RATE * WHISPER_CHUNK_LENGTH  # 480,000 sam
 
 # Day 10: PRD latency target
 PRD_LATENCY_TARGET_SEC = 2.5
+
+
+def _clean_hallucinated_repetitions(text: str) -> str:
+    """
+    Detects and removes Whisper hallucination loops where the same word or short
+    phrase is repeated many times consecutively (e.g. "علمہ علمہ علمہ علمہ ...").
+    
+    Strategy:
+    1. If any single token appears 5+ times consecutively, collapse to 1 occurrence.
+    2. If any 2-3 word phrase repeats 4+ times consecutively, collapse to 1 occurrence.
+    3. Remove leading/trailing whitespace artifacts.
+    """
+    if not text or len(text) < 20:
+        return text
+
+    # Phase 1: Collapse single-word repetitions (5+ consecutive identical words)
+    # Matches: "علمہ علمہ علمہ علمہ علمہ" -> "علمہ"
+    cleaned = re.sub(r'\b(\S+)(?:\s+\1){4,}\b', r'\1', text)
+
+    # Phase 2: Collapse 2-word phrase repetitions (4+ consecutive)
+    # Matches: "اسلام علمہ اسلام علمہ اسلام علمہ اسلام علمہ" -> "اسلام علمہ"
+    cleaned = re.sub(r'((?:\S+\s+){1,2}\S+)(?:\s+\1){3,}', r'\1', cleaned)
+
+    # Phase 3: If the result is suspiciously short after cleaning (just 1-2 words
+    # that were repeated), it was likely pure hallucination — return empty
+    words_after = cleaned.split()
+    if len(words_after) <= 2 and len(text.split()) > 20:
+        return ""
+
+    return cleaned.strip()
+
 
 class WhisperTranscriber:
     def __init__(self, model_name: str = "openai/whisper-small"):
@@ -111,10 +143,14 @@ class WhisperTranscriber:
                 else:
                     input_features = input_features.to(dtype=torch.float32)
 
-                # Fast greedy decoding (num_beams=1) for 5x inference speedup (<1.5s latency)
+                # Anti-hallucination decoding config:
+                # - no_repeat_ngram_size=3: prevents any 3-word phrase from repeating
+                # - num_beams=1: greedy decoding for speed
+                # - temperature=0.0: deterministic output
                 gen_kwargs = {
                     "num_beams": 1,
                     "temperature": 0.0,
+                    "no_repeat_ngram_size": 3,
                 }
 
                 if language:
@@ -132,6 +168,9 @@ class WhisperTranscriber:
                     predicted_ids, skip_special_tokens=True
                 )[0].strip()
                 
+                # Post-processing: remove any hallucinated repetition loops that slipped through
+                chunk_text = _clean_hallucinated_repetitions(chunk_text)
+                
                 if chunk_text:
                     all_transcriptions.append(chunk_text)
                     try:
@@ -140,6 +179,10 @@ class WhisperTranscriber:
                         print(f"[ShifaScribe AI] Chunk {i+1}/{len(chunks_to_process)}: ({len(chunk_text)} chars)")
 
             transcribed_text = " ".join(all_transcriptions).strip()
+            
+            # Final pass: clean any cross-chunk repetition artifacts
+            transcribed_text = _clean_hallucinated_repetitions(transcribed_text)
+            
             try:
                 print(f"[ShifaScribe AI] Transcription complete. Final output: '{transcribed_text}' ({len(transcribed_text)} chars)")
             except Exception:
