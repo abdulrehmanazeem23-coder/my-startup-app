@@ -151,11 +151,11 @@ def extract_medications(text: str) -> List[str]:
             if formatted_med not in medications:
                 medications.append(formatted_med)
 
-    # Pattern 2: Fallback for known drug names without explicit strength in regex match
-    if not medications:
-        for drug in KNOWN_DRUGS:
-            if re.search(r"\b" + re.escape(drug) + r"\b", text, re.IGNORECASE):
-                # Search for nearby strength if available
+    # Pattern 2: Also capture known drug names without explicit strength in regex match
+    for drug in KNOWN_DRUGS:
+        if re.search(r"\b" + re.escape(drug) + r"\b", text, re.IGNORECASE):
+            # Check if this drug is already in medications
+            if not any(drug.lower() in m.lower() for m in medications):
                 strength_match = re.search(r"\b(\d+\s*(?:mg|g|ml))\b", text, re.IGNORECASE)
                 strength_str = strength_match.group(1).lower() if strength_match else "500mg"
                 formatted_med = f"Tab. {drug.title()} {strength_str}"
@@ -183,14 +183,14 @@ def extract_clinical_notes(text: str) -> str:
 
     t = text.lower()
 
-    # Pattern A: [number/word] [days/din] ... [recheckup/dobara/visit]
+    # Pattern A: [number/word] [days/din] ... [recheckup/dobara/visit/dawara/checkup]
     mA = re.search(
-        r"(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen|ایک|دو|تین|چار|پانچ|سات)\s*(din|days?|hafte|weeks?|mahina|months?|دین|دن)\s*(?:[^\w\s]+\s*|\w+\s+){0,5}(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ)",
+        r"(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen|ایک|دو|تین|چار|پانچ|سات)\s*(din|days?|hafte|weeks?|mahina|months?|دین|دن)\s*(?:[^\w\s]+\s*|\w+\s+){0,5}(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ|دوارہ|چکپ)",
         t
     )
-    # Pattern B: [recheckup/dobara/visit] ... [number/word] [days/din]
+    # Pattern B: [recheckup/dobara/visit/dawara/checkup] ... [number/word] [days/din]
     mB = re.search(
-        r"(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ)\s*(?:[^\w\s]+\s*|\w+\s+){0,5}(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen|ایک|دو|تین|چار|پانچ|سات)\s*(din|days?|hafte|weeks?|mahina|months?|دین|دن)",
+        r"(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ|دوارہ|چکپ)\s*(?:[^\w\s]+\s*|\w+\s+){0,5}(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen|ایک|دو|تین|چار|پانچ|سات)\s*(din|days?|hafte|weeks?|mahina|months?|دین|دن)",
         t
     )
 
@@ -201,7 +201,7 @@ def extract_clinical_notes(text: str) -> str:
         unit_clean = "days" if any(u in raw_unit for u in ["din", "day", "دین", "دن"]) else ("weeks" if any(u in raw_unit for u in ["haft", "week", "ہفت"]) else "months")
         return f"Follow-up recheckup advised after {num_clean} {unit_clean}."
 
-    if any(k in t for k in ["dobara", "recheckup", "re-checkup", "checkup", "visit", "چیکپ", "وزٹ", "چیکٹ"]):
+    if any(k in t for k in ["dobara", "recheckup", "re-checkup", "checkup", "visit", "چیکپ", "وزٹ", "چیکٹ", "دوارہ|چکپ"]):
         return "Follow-up OPD recheckup advised."
 
     return "Standard OPD Follow-up & Care."

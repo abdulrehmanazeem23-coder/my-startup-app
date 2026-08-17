@@ -16,12 +16,12 @@ from typing import Dict, Optional
 FREQUENCY_PATTERNS = [
     # TDS (Three Times Daily)
     (
-        r"\b(din\s+(?:mai|mein|mian)\s+(?:teen|3)\s+(?:dafa|time|times)|(?:teen|3)\s+(?:dafa|time|times)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*تین\s*(?:دفعہ|ٹائم|طائم)|تین\s*(?:ٹائم|طائم)|۳\s*(?:ٹائم|طائم)|tds|t\.d\.s|three\s+times\s+a\s+day)\b",
+        r"\b(din\s+(?:mai|mein|mian)\s+(?:teen|3)\s+(?:dafa|time|times|طیم)|(?:teen|3)\s+(?:dafa|time|times|طیم)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*(?:تین|3|۳)\s*(?:دفعہ|ٹائم|طائم|طیم)|تین\s*(?:ٹائم|طائم|طیم)|[3۳]\s*(?:ٹائم|طائم|طیم)|tds|t\.d\.s|three\s+times\s+a\s+day)\b",
         "1-1-1 (TDS)",
     ),
     # BID (Twice Daily)
     (
-        r"\b(subah\s+o?\s*shaam|subah\s+sham|subah\s+o?\s*shaam|صبح\s*شام|din\s+(?:mai|mein|mian)\s+(?:do|2)\s+(?:dafa|time|times)|(?:do|2)\s+(?:dafa|time|times)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*دو\s*(?:دفعہ|ٹائم|طائم)|دو\s*(?:ٹائم|طائم)|۲\s*(?:ٹائم|طائم)|bid|b\.i\.d|twice\s+daily)\b",
+        r"\b(subah\s+o?\s*shaam|subah\s+sham|subah\s+o?\s*shaam|صبح\s*شام|din\s+(?:mai|mein|mian)\s+(?:do|2)\s+(?:dafa|time|times|طیم)|(?:do|2)\s+(?:dafa|time|times|طیم)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*(?:دو|2|۲)\s*(?:دفعہ|ٹائم|طائم|طیم)|دو\s*(?:ٹائم|طائم|طیم)|[2۲]\s*(?:ٹائم|طائم|طیم)|bid|b\.i\.d|twice\s+daily)\b",
         "1-0-1 (BID)",
     ),
     # OD (Once Daily)
