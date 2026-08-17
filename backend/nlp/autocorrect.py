@@ -1,7 +1,7 @@
 """
 ShifaScribe Clinical Text Auto-Corrector Engine
 Phonetically auto-corrects noisy Whisper speech transcripts, Urdu script transliterations,
-and drug name misspellings (e.g. "penadol", "punadol", "پینڈال", "پیناڈول" -> "Panadol").
+and drug name misspellings (e.g. "penadol", "punadol", "پینڈال", "اگمینٹن" -> "Augmentin").
 """
 
 import re
@@ -24,7 +24,7 @@ CLINICAL_AUTOCORRECT_RULES = [
     (r"\b(paracetmol|paracetamal|parasitamol|پیراسیٹامول|پراسیٹامول)\b", "Paracetamol"),
     (r"\b(brofen|bruffen|bruphen|بروفن|بروفین|ابروفن)\b", "Brufen"),
     (r"\b(ibuprofen|ibrufen)\b", "Ibuprofen"),
-    (r"\b(augmenten|aggmentin|ogmentin|اگمنٹن|اگمنٹین|اسکا\s*بم|اسکھابم|اسکابم)\b", "Augmentin"),
+    (r"\b(augmenten|aggmentin|ogmentin|اگمنٹن|اگمنٹین|اگمینٹن|اگمینٹین|اسکا\s*بم|اسکھابم|اسکابم)\b", "Augmentin"),
     (r"\b(ponsten|ponstaan|پونسٹان|پونسٹین|پونستان)\b", "Ponstan"),
     (r"\b(dispren|desprin|ڈسپرین)\b", "Disprin"),
     (r"\b(flygyl|flgyl|flagil|فلیجل|فلائیجل)\b", "Flagyl"),
@@ -34,17 +34,26 @@ CLINICAL_AUTOCORRECT_RULES = [
     (r"\b(gravinate|گریوینیٹ)\b", "Gravinate"),
 
     # ── 2. Urdu Script Dosage Units & Strength Formats ──────────────────
-    (r"(\d+)\s*(?:ملی\s*گرام|ملگرام|ملیگرام|ایم\s*جی)\b", r"\1mg"),
+    (r"(\d+)\s*(?:ملک\s*گرام|ملی\s*گرام|ملگرام|ملیگرام|ایم\s*جی|ایمجی)\b", r"\1mg"),
     (r"(\d+)\s*(?:گرام|گرامز)\b", r"\1g"),
     (r"(\d+)\s*(?:ملی\s*لیٹر|ایم\s*ایل)\b", r"\1ml"),
 
     # ── 3. Urdu Script Frequencies & Directives ──────────────────────────
-    (r"\b(تیڈیل|ٹی\s*ڈی\s*ایس|ٹیڈیل|تین\s+دفعہ|تیڈیل\s+کی\s+دوزیج|ڈیل|ڈیڈیل)\b", "TDS"),
-    (r"\b(بی\s*آئی\s*ڈی|بی\s*ڈی|صبح\s+شام)\b", "BID"),
-    (r"\b(او\s*ڈی|ایک\s+دفعہ|روزانہ)\b", "OD"),
+    (r"\b(تیڈیل|ٹی\s*ڈی\s*ایس|ٹیڈیل|تین\s+دفعہ|تین\s*ٹائم|تین\s*ٹائمز|۳\s*ٹائم|3\s*times?|تیڈیل\s+کی\s+دوزیج|ڈیل|ڈیڈیل)\b", "TDS"),
+    (r"\b(بی\s*آئی\s*ڈی|بی\s*ڈی|صبح\s+شام|دو\s*ٹائم|دو\s*ٹائمز|۲\s*ٹائم|2\s*times?)\b", "BID"),
+    (r"\b(او\s*ڈی|ایک\s+دفعہ|ایک\s*ٹائم|ایک\s*ٹائمز|روزانہ)\b", "OD"),
     (r"\b(کیو\s*ایچ\s*ایس|راات\s*کو|رات\s*کو)\b", "QHS"),
 
-    # ── 4. Urdu Script Symptoms & Complaints ────────────────────────────
+    # ── 4. Urdu Script Duration & Phonetics ──────────────────────────────
+    (r"(\d+)\s*دین\b", r"\1 din"),
+    (r"(ایک|یک)\s*دین\b", "1 din"),
+    (r"دو\s*دین\b", "2 din"),
+    (r"تین\s*دین\b", "3 din"),
+    (r"چار\s*دین\b", "4 din"),
+    (r"پانچ\s*دین\b", "5 din"),
+    (r"سات\s*دین\b", "7 din"),
+
+    # ── 5. Urdu Script Symptoms & Complaints ────────────────────────────
     (r"\b(سویئر\s*ہیڈک|ہیڈک|ہیڈیک|سر\s*میں\s*درد|سردرد)\b", "headache"),
     (r"\b(فیور|بخار|تیز\s*بخار)\b", "fever"),
     (r"\b(فلو|نزلا|نزلہ|زکام)\b", "flu"),
@@ -55,7 +64,7 @@ CLINICAL_AUTOCORRECT_RULES = [
 def autocorrect_transcript(text: str) -> str:
     """
     Phonetically auto-corrects a raw transcribed speech string (English, Roman Urdu, or Urdu script).
-    Fixes drug misspellings (penadol/punadol/پینڈال -> Panadol), converts Urdu dosage units,
+    Fixes drug misspellings (penadol/punadol/اگمینٹن -> Augmentin), converts Urdu dosage units (500 ملک گرام -> 500mg),
     and standardizes clinical dictation for immediate form auto-filling.
     """
     if not text or not isinstance(text, str):
