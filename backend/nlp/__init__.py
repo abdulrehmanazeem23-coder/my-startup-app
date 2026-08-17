@@ -10,6 +10,7 @@ from .autocorrect import autocorrect_transcript
 from .entity_extractor import (
     extract_symptoms,
     extract_medications,
+    extract_medications_detailed,
     extract_full_prescription,
 )
 
@@ -19,5 +20,6 @@ __all__ = [
     "autocorrect_transcript",
     "extract_symptoms",
     "extract_medications",
+    "extract_medications_detailed",
     "extract_full_prescription",
 ]

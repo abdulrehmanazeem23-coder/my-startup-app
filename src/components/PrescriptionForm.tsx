@@ -2,9 +2,20 @@
 
 import { useState, useEffect } from "react";
 
+export interface MedicationDetail {
+  name: string;
+  strength: string;
+  form: string;
+  formatted: string;
+  frequency: string;
+  duration: string;
+  instruction: string;
+}
+
 export interface StructuredEhrData {
   symptoms?: string[];
   medications?: string[];
+  medications_detailed?: MedicationDetail[];
   dosage_frequency?: string;
   duration?: string;
   food_relation?: string | null;
@@ -108,17 +119,21 @@ Date: ${new Date().toLocaleDateString()}
 [CHIEF COMPLAINTS / SYMPTOMS]
 ${symptoms.length > 0 ? symptoms.map((s) => `• ${s}`).join("\n") : "None specified"}
 
-[PRESCRIBED MEDICATIONS]
-${medications.length > 0 ? medications.map((m) => `• ${m}`).join("\n") : "None prescribed"}
+[PRESCRIBED MEDICATIONS & DOSAGES]
+${
+  medications.length > 0
+    ? medications.map((m, i) => `${i + 1}. ${m}`).join("\n")
+    : "None prescribed"
+}
 
-[DOSAGE & TIMING]
+[PRIMARY DOSAGE & DURATION SUMMARY]
 Frequency: ${dosageFrequency || "As Directed"}
 Duration : ${duration || "Not Specified"}
 
-[NOTES]
-${clinicalNotes || "Standard OPD Follow-up"}
+[DOCTOR CLINICAL NOTES / ADVICE]
+${clinicalNotes || "Standard OPD Follow-up & Care."}
 
-[RAW URDU TRANSCRIPT]
+[RAW TRANSCRIPTION AUDIT LOG]
 "${rawTranscript || "N/A"}"
 ========================================
     `.trim();
@@ -155,11 +170,11 @@ ${clinicalNotes || "Standard OPD Follow-up"}
               Interactive E-Prescription Form
             </h2>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20 font-mono font-medium">
-              Day 14 • Sprint 3
+              Multi-Drug Scribe • Sprint 3
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Auto-populated in real-time from Whisper AI &amp; ShifaScribe NLP Engine
+            Auto-populated in real-time from Whisper AI &amp; ShifaScribe NLP Engine (Per-Drug Dosages, Frequencies &amp; Durations)
           </p>
         </div>
 
@@ -180,12 +195,12 @@ ${clinicalNotes || "Standard OPD Follow-up"}
                   d="M5 13l4 4L19 7"
                 />
               </svg>
-              ✨ Auto-Filled by ShifaScribe AI
+              ✨ Auto-Filled ({medications.length} Drug{medications.length === 1 ? "" : "s"} Extracted)
             </span>
           ) : status === "processing_ai" || status === "uploading" ? (
             <span className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-              AI Extracting Prescription...
+              AI Extracting Multi-Drug EHR...
             </span>
           ) : (
             <span className="px-3.5 py-1.5 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
@@ -197,7 +212,7 @@ ${clinicalNotes || "Standard OPD Follow-up"}
 
       {/* Form Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column: Symptoms & Chief Complaints */}
+        {/* Left Column: Symptoms & Chief Complaints + Timing Controls */}
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-teal-400 uppercase tracking-wider mb-2 flex items-center justify-between">
@@ -251,12 +266,15 @@ ${clinicalNotes || "Standard OPD Follow-up"}
             </div>
           </div>
 
-          {/* Dosage & Duration Control Inputs */}
+          {/* Dosage & Duration Summary Controls */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Dosage Frequency */}
+            {/* Primary Dosage Frequency */}
             <div>
-              <label className="block text-xs font-semibold text-teal-400 uppercase tracking-wider mb-2">
-                2. Dosage / Frequency (خوراک)
+              <label className="block text-xs font-semibold text-teal-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                <span>2. Dosage / Frequency (خوراک)</span>
+                {medications.length > 1 && (
+                  <span className="text-[10px] text-teal-400 font-normal">Primary / Summary</span>
+                )}
               </label>
               <input
                 type="text"
@@ -266,20 +284,25 @@ ${clinicalNotes || "Standard OPD Follow-up"}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-teal-500/60 transition-colors"
               />
               <span className="text-[10px] text-slate-500 mt-1 block">
-                Translated from colloquial Urdu dictation
+                {medications.length > 1
+                  ? "See individual drug instructions on right"
+                  : "Translated from colloquial Urdu dictation"}
               </span>
             </div>
 
-            {/* Duration */}
+            {/* Primary Duration */}
             <div>
-              <label className="block text-xs font-semibold text-teal-400 uppercase tracking-wider mb-2">
-                3. Duration (مدت)
+              <label className="block text-xs font-semibold text-teal-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                <span>3. Duration (مدت)</span>
+                {medications.length > 1 && (
+                  <span className="text-[10px] text-teal-400 font-normal">Primary / Summary</span>
+                )}
               </label>
               <input
                 type="text"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                placeholder="e.g. 7 Days / 2 Days"
+                placeholder="e.g. 7 Days / 5 Days"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-teal-500/60 transition-colors"
               />
               <span className="text-[10px] text-slate-500 mt-1 block">
@@ -289,17 +312,17 @@ ${clinicalNotes || "Standard OPD Follow-up"}
           </div>
         </div>
 
-        {/* Right Column: Prescribed Medications Table & DRAP Validation */}
+        {/* Right Column: Prescribed Medications Table & Per-Drug Details */}
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-teal-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-              <span>4. Prescribed Medications (ادویات)</span>
+              <span>4. Prescribed Medications (ادویات اور ان کی خوراک)</span>
               <span className="text-[10px] text-emerald-400 font-normal">
                 DRAP Catalog Validated ✓
               </span>
             </label>
 
-            {/* Medications Table List */}
+            {/* Medications Table List with Individual Instructions */}
             <div className="bg-slate-950/70 border border-slate-800 rounded-xl overflow-hidden min-h-[140px]">
               {medications.length > 0 ? (
                 <div className="divide-y divide-slate-800/80">
@@ -308,8 +331,8 @@ ${clinicalNotes || "Standard OPD Follow-up"}
                       key={idx}
                       className="p-3 flex items-center justify-between gap-3 hover:bg-slate-900/50 transition-colors"
                     >
-                      <div className="flex items-center gap-2.5 flex-1">
-                        <span className="w-5 h-5 rounded-full bg-teal-500/10 text-teal-400 font-mono text-[10px] flex items-center justify-center font-bold border border-teal-500/20">
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-teal-500/10 text-teal-400 font-mono text-[10px] flex items-center justify-center font-bold border border-teal-500/20 flex-shrink-0">
                           {idx + 1}
                         </span>
                         <input
@@ -323,7 +346,7 @@ ${clinicalNotes || "Standard OPD Follow-up"}
                       <button
                         type="button"
                         onClick={() => handleRemoveMedication(idx)}
-                        className="text-slate-500 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-slate-800 transition-colors"
+                        className="text-slate-500 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-slate-800 transition-colors flex-shrink-0"
                         title="Delete medication"
                       >
                         Delete
@@ -333,7 +356,7 @@ ${clinicalNotes || "Standard OPD Follow-up"}
                 </div>
               ) : (
                 <div className="p-6 text-center text-xs text-slate-500 italic">
-                  No prescribed medications extracted yet. Auto-fills from Whisper audio!
+                  No prescribed medications extracted yet. Auto-fills all medicines, dosages &amp; durations from Whisper audio!
                 </div>
               )}
             </div>
@@ -342,7 +365,7 @@ ${clinicalNotes || "Standard OPD Follow-up"}
             <div className="flex gap-2 mt-2">
               <input
                 type="text"
-                placeholder="Add medication (e.g. Tab. Panadol 500mg)..."
+                placeholder="Add medication (e.g. Tab. Panadol 500mg — 1-1-1 (TDS), 5 Days)..."
                 value={newMedInput}
                 onChange={(e) => setNewMedInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddMedication())}
@@ -361,7 +384,7 @@ ${clinicalNotes || "Standard OPD Follow-up"}
           {/* Clinical Notes / Doctor Remarks */}
           <div>
             <label className="block text-xs font-semibold text-teal-400 uppercase tracking-wider mb-1.5">
-              5. Doctor Clinical Notes / Advice
+              5. Doctor Clinical Notes / Advice (ڈاکٹر کی ہدایات)
             </label>
             <textarea
               rows={2}

@@ -16,17 +16,17 @@ from typing import Dict, Optional
 FREQUENCY_PATTERNS = [
     # TDS (Three Times Daily)
     (
-        r"\b(din\s+(?:mai|mein|mian)\s+(?:teen|3)\s+(?:dafa|time|times|طیم)|(?:teen|3)\s+(?:dafa|time|times|طیم)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*(?:تین|3|۳)\s*(?:دفعہ|ٹائم|طائم|طیم)|تین\s*(?:ٹائم|طائم|طیم)|[3۳]\s*(?:ٹائم|طائم|طیم)|tds|t\.d\.s|three\s+times\s+a\s+day)\b",
+        r"\b(din\s+(?:mai|mein|mian)\s+(?:teen|3)\s+(?:dafa|time|times|طیم|مرتبہ|بار)|(?:teen|3)\s+(?:dafa|time|times|طیم|مرتبہ|بار)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*(?:تین|3|۳)\s*(?:دفعہ|ٹائم|طائم|طیم|مرتبہ|بار)|تین\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|[3۳]\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|tds|t\.d\.s|three\s+times\s+a\s+day)\b",
         "1-1-1 (TDS)",
     ),
     # BID (Twice Daily)
     (
-        r"\b(subah\s+o?\s*shaam|subah\s+sham|subah\s+o?\s*shaam|صبح\s*شام|din\s+(?:mai|mein|mian)\s+(?:do|2)\s+(?:dafa|time|times|طیم)|(?:do|2)\s+(?:dafa|time|times|طیم)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*(?:دو|2|۲)\s*(?:دفعہ|ٹائم|طائم|طیم)|دو\s*(?:ٹائم|طائم|طیم)|[2۲]\s*(?:ٹائم|طائم|طیم)|bid|b\.i\.d|twice\s+daily)\b",
+        r"\b(subah\s+o?\s*shaam|subah\s+sham|subah\s+o?\s*shaam|صبح\s*شام|صبح\s*و\s*شام|din\s+(?:mai|mein|mian)\s+(?:do|2)\s+(?:dafa|time|times|طیم|مرتبہ|بار)|(?:do|2)\s+(?:dafa|time|times|طیم|مرتبہ|بار)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*(?:دو|2|۲)\s*(?:دفعہ|ٹائم|طائم|طیم|مرتبہ|بار)|دو\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|[2۲]\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|bid|b\.i\.d|twice\s+daily)\b",
         "1-0-1 (BID)",
     ),
     # OD (Once Daily)
     (
-        r"\b(din\s+(?:mai|mein|mian)\s+(?:ek|1)\s+(?:dafa|time|times)|(?:ek|1)\s+(?:dafa|time|times)\s*(?:din\s+(?:mai|mein))?|ایک\s*دفعہ\s*دن\s*میں|ایک\s*ٹائم|od|o\.d|once\s+daily)\b",
+        r"\b(din\s+(?:mai|mein|mian)\s+(?:ek|1)\s+(?:dafa|time|times|طیم|مرتبہ|بار)|(?:ek|1)\s+(?:dafa|time|times|طیم|مرتبہ|بار)\s*(?:din\s+(?:mai|mein))?|ایک\s*(?:دفعہ|مرتبہ|بار)\s*دن\s*میں|دن\s*میں\s*ایک\s*(?:دفعہ|مرتبہ|بار)|ایک\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|[1۱]\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|روزانہ|od|o\.d|once\s+daily)\b",
         "1-0-0 (OD)",
     ),
     # QHS (Nightly)
