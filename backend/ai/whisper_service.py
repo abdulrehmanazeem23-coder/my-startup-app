@@ -19,6 +19,21 @@ WHISPER_N_SAMPLES    = WHISPER_SAMPLE_RATE * WHISPER_CHUNK_LENGTH  # 480,000 sam
 # Day 10: PRD latency target
 PRD_LATENCY_TARGET_SEC = 2.5
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Arabic/Urdu diacritical marks and extended characters that are NEVER
+# standalone meaningful tokens — if they appear as isolated tokens or in
+# dense sequences, it's hallucination garbage.
+# ═══════════════════════════════════════════════════════════════════════════
+_ARABIC_DIACRITICS = set("ًٌٍَُِّْٰٕٖٓٔٗ٘ٙٚ")
+_ARABIC_EXTENDED_CHARS = set("ٮٯٱٲٳٴٵٶٷٸٹٺٻټٽٿ")
+
+# Common 1-2 char Urdu/Arabic words that are LEGITIMATE (don't flag these as gibberish)
+_LEGIT_SHORT_URDU = {
+    "کو", "ہے", "اور", "بھی", "اس", "کا", "کی", "کے", "نے", "سے", "پر",
+    "تو", "جو", "یہ", "وہ", "ان", "اب", "جب", "تب", "نہ", "ہی", "میں",
+    "ہم", "ہو", "دو", "یا", "آج", "کم", "بن", "آپ", "گی", "دن",
+}
+
 
 def _clean_hallucinated_repetitions(text: str) -> str:
     """
@@ -34,11 +49,9 @@ def _clean_hallucinated_repetitions(text: str) -> str:
         return text
 
     # Phase 1: Collapse single-word repetitions (5+ consecutive identical words)
-    # Matches: "علمہ علمہ علمہ علمہ علمہ" -> "علمہ"
     cleaned = re.sub(r'\b(\S+)(?:\s+\1){4,}\b', r'\1', text)
 
     # Phase 2: Collapse 2-word phrase repetitions (4+ consecutive)
-    # Matches: "اسلام علمہ اسلام علمہ اسلام علمہ اسلام علمہ" -> "اسلام علمہ"
     cleaned = re.sub(r'((?:\S+\s+){1,2}\S+)(?:\s+\1){3,}', r'\1', cleaned)
 
     # Phase 3: If the result is suspiciously short after cleaning (just 1-2 words
@@ -48,6 +61,94 @@ def _clean_hallucinated_repetitions(text: str) -> str:
         return ""
 
     return cleaned.strip()
+
+
+def _clean_character_soup_hallucination(text: str) -> str:
+    """
+    Detects and removes Whisper 'character soup' hallucinations where the model
+    outputs random isolated characters, diacritics, and nonsense tokens instead
+    of coherent speech.
+    
+    This is a DIFFERENT hallucination pattern from word-repetition:
+    - Word repetition: "علمہ علمہ علمہ علمہ علمہ"
+    - Character soup:  "ٸڈی ای ١ی ٨ی ٰی ٧ی ٵی ٱی ٲی ٴی ٿی ..."
+    
+    Detection strategy:
+    Uses a sliding window of 12 tokens. If >= 8 tokens in the window are
+    'garbage' (isolated diacritics, single extended chars, or very short
+    non-meaningful tokens), we truncate the text at that point.
+    """
+    if not text:
+        return text
+
+    tokens = text.split()
+    if len(tokens) < 15:
+        return text  # Too short to contain meaningful + garbage sections
+
+    def _is_garbage_token(token: str) -> bool:
+        """Returns True if a token looks like hallucination garbage."""
+        clean = token.strip()
+        if not clean:
+            return True
+        
+        # Pure diacritical marks
+        if all(c in _ARABIC_DIACRITICS or c in " " for c in clean):
+            return True
+        
+        # Single extended Arabic chars that aren't real words
+        if len(clean) <= 2 and any(c in _ARABIC_EXTENDED_CHARS for c in clean):
+            return True
+        
+        # Single character followed by ی (common hallucination pattern: "ٸی", "ٵی")
+        if len(clean) <= 3 and clean.endswith("ی") and len(clean) >= 2:
+            base = clean[:-1]
+            # If base is a diacritic or extended char, it's garbage
+            if all(c in _ARABIC_DIACRITICS or c in _ARABIC_EXTENDED_CHARS for c in base):
+                return True
+
+        # Very short token (1-2 chars) that's NOT a known legitimate short Urdu word
+        # and NOT a number and NOT a common English word
+        if len(clean) <= 2:
+            if clean in _LEGIT_SHORT_URDU:
+                return False
+            if clean.isdigit():
+                return False
+            if clean.isascii() and clean.isalpha():
+                return False  # English short words like "is", "to", etc.
+            # Single isolated Urdu chars that aren't meaningful words
+            if len(clean) == 1:
+                return True
+        
+        # Tokens that are just "ٹ" followed by 1-2 random chars (e.g. "ٹع", "ٹب", "ٹف")
+        if len(clean) <= 3 and clean.startswith("ٹ") and clean not in {"ٹائم", "ٹائمز"}:
+            return True
+        
+        return False
+
+    # Sliding window: find where garbage starts
+    WINDOW_SIZE = 12
+    GARBAGE_THRESHOLD = 8  # If 8+ of 12 tokens are garbage, it's hallucination
+    
+    cutoff_index = len(tokens)  # Default: keep everything
+    
+    for i in range(len(tokens) - WINDOW_SIZE + 1):
+        window = tokens[i:i + WINDOW_SIZE]
+        garbage_count = sum(1 for t in window if _is_garbage_token(t))
+        
+        if garbage_count >= GARBAGE_THRESHOLD:
+            cutoff_index = i
+            break
+    
+    if cutoff_index < len(tokens):
+        clean_text = " ".join(tokens[:cutoff_index]).strip()
+        removed_count = len(tokens) - cutoff_index
+        try:
+            print(f"[ShifaScribe AI] Hallucination detector: removed {removed_count} garbage tokens from position {cutoff_index}")
+        except Exception:
+            pass
+        return clean_text
+    
+    return text
 
 
 class WhisperTranscriber:
@@ -145,12 +246,14 @@ class WhisperTranscriber:
 
                 # Anti-hallucination decoding config:
                 # - no_repeat_ngram_size=3: prevents any 3-word phrase from repeating
+                # - condition_on_prev=False: prevents hallucination cascading between chunks
                 # - num_beams=1: greedy decoding for speed
                 # - temperature=0.0: deterministic output
                 gen_kwargs = {
                     "num_beams": 1,
                     "temperature": 0.0,
                     "no_repeat_ngram_size": 3,
+                    "condition_on_prev_tokens": False,
                 }
 
                 if language:
@@ -168,8 +271,11 @@ class WhisperTranscriber:
                     predicted_ids, skip_special_tokens=True
                 )[0].strip()
                 
-                # Post-processing: remove any hallucinated repetition loops that slipped through
+                # Post-processing Phase 1: remove repeated-word hallucination loops
                 chunk_text = _clean_hallucinated_repetitions(chunk_text)
+                
+                # Post-processing Phase 2: remove character-soup hallucination garbage
+                chunk_text = _clean_character_soup_hallucination(chunk_text)
                 
                 if chunk_text:
                     all_transcriptions.append(chunk_text)
@@ -180,8 +286,9 @@ class WhisperTranscriber:
 
             transcribed_text = " ".join(all_transcriptions).strip()
             
-            # Final pass: clean any cross-chunk repetition artifacts
+            # Final pass: clean any cross-chunk artifacts
             transcribed_text = _clean_hallucinated_repetitions(transcribed_text)
+            transcribed_text = _clean_character_soup_hallucination(transcribed_text)
             
             try:
                 print(f"[ShifaScribe AI] Transcription complete. Final output: '{transcribed_text}' ({len(transcribed_text)} chars)")
