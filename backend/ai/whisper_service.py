@@ -24,7 +24,7 @@ PRD_LATENCY_TARGET_SEC = 2.5
 # standalone meaningful tokens — if they appear as isolated tokens or in
 # dense sequences, it's hallucination garbage.
 # ═══════════════════════════════════════════════════════════════════════════
-_ARABIC_DIACRITICS = set("ًٌٍَُِّْٰٕٖٓٔٗ٘ٙٚ")
+_ARABIC_DIACRITICS = set("ًٌٍَُِّْٰٕٖٓٔٗ٘ٙٚ")
 _ARABIC_EXTENDED_CHARS = set("ٮٯٱٲٳٴٵٶٷٸٹٺٻټٽٿ")
 
 # Common 1-2 char Urdu/Arabic words that are LEGITIMATE (don't flag these as gibberish)
@@ -34,16 +34,20 @@ _LEGIT_SHORT_URDU = {
     "ہم", "ہو", "دو", "یا", "آج", "کم", "بن", "آپ", "گی", "دن",
 }
 
+# Initial prompt to guide Whisper's transcription — conditions the model to
+# expect medical dictation with drug names, dosages, and clinical terms.
+WHISPER_INITIAL_PROMPT = (
+    "Medical prescription dictation. Patient symptoms, medicines like Panadol, "
+    "Augmentin, Brufen, Cefspan, Ponstan, Flagyl, Disprin, Risek, Arinac. "
+    "Dosages in mg. Frequency like 3 times a day, 2 times a day. Duration in days. "
+    "Recheckup follow-up advice."
+)
+
 
 def _clean_hallucinated_repetitions(text: str) -> str:
     """
     Detects and removes Whisper hallucination loops where the same word or short
     phrase is repeated many times consecutively (e.g. "علمہ علمہ علمہ علمہ ...").
-    
-    Strategy:
-    1. If any single token appears 5+ times consecutively, collapse to 1 occurrence.
-    2. If any 2-3 word phrase repeats 4+ times consecutively, collapse to 1 occurrence.
-    3. Remove leading/trailing whitespace artifacts.
     """
     if not text or len(text) < 20:
         return text
@@ -66,24 +70,16 @@ def _clean_hallucinated_repetitions(text: str) -> str:
 def _clean_character_soup_hallucination(text: str) -> str:
     """
     Detects and removes Whisper 'character soup' hallucinations where the model
-    outputs random isolated characters, diacritics, and nonsense tokens instead
-    of coherent speech.
+    outputs random isolated characters, diacritics, and nonsense tokens.
     
-    This is a DIFFERENT hallucination pattern from word-repetition:
-    - Word repetition: "علمہ علمہ علمہ علمہ علمہ"
-    - Character soup:  "ٸڈی ای ١ی ٨ی ٰی ٧ی ٵی ٱی ٲی ٴی ٿی ..."
-    
-    Detection strategy:
-    Uses a sliding window of 12 tokens. If >= 8 tokens in the window are
-    'garbage' (isolated diacritics, single extended chars, or very short
-    non-meaningful tokens), we truncate the text at that point.
+    Uses a sliding window of 10 tokens. If >= 6 tokens are 'garbage', truncate.
     """
     if not text:
         return text
 
     tokens = text.split()
-    if len(tokens) < 15:
-        return text  # Too short to contain meaningful + garbage sections
+    if len(tokens) < 12:
+        return text
 
     def _is_garbage_token(token: str) -> bool:
         """Returns True if a token looks like hallucination garbage."""
@@ -102,20 +98,17 @@ def _clean_character_soup_hallucination(text: str) -> str:
         # Single character followed by ی (common hallucination pattern: "ٸی", "ٵی")
         if len(clean) <= 3 and clean.endswith("ی") and len(clean) >= 2:
             base = clean[:-1]
-            # If base is a diacritic or extended char, it's garbage
             if all(c in _ARABIC_DIACRITICS or c in _ARABIC_EXTENDED_CHARS for c in base):
                 return True
 
         # Very short token (1-2 chars) that's NOT a known legitimate short Urdu word
-        # and NOT a number and NOT a common English word
         if len(clean) <= 2:
             if clean in _LEGIT_SHORT_URDU:
                 return False
             if clean.isdigit():
                 return False
             if clean.isascii() and clean.isalpha():
-                return False  # English short words like "is", "to", etc.
-            # Single isolated Urdu chars that aren't meaningful words
+                return False
             if len(clean) == 1:
                 return True
         
@@ -126,10 +119,10 @@ def _clean_character_soup_hallucination(text: str) -> str:
         return False
 
     # Sliding window: find where garbage starts
-    WINDOW_SIZE = 12
-    GARBAGE_THRESHOLD = 8  # If 8+ of 12 tokens are garbage, it's hallucination
+    WINDOW_SIZE = 10
+    GARBAGE_THRESHOLD = 6  # If 6+ of 10 tokens are garbage, it's hallucination
     
-    cutoff_index = len(tokens)  # Default: keep everything
+    cutoff_index = len(tokens)
     
     for i in range(len(tokens) - WINDOW_SIZE + 1):
         window = tokens[i:i + WINDOW_SIZE]
@@ -185,19 +178,15 @@ class WhisperTranscriber:
                 self.model = self.model.to("cuda")
                 
             self.model.eval()
+
+            # Pre-compute the initial prompt token IDs for conditioning
+            self._prompt_ids = self.processor.get_prompt_ids(WHISPER_INITIAL_PROMPT, return_tensors="pt")
+            print(f"[ShifaScribe AI] Initial prompt loaded ({len(self._prompt_ids[0])} tokens)")
+
             print(f"[ShifaScribe AI] Whisper model '{self.model_name}' initialized successfully on {self.device_label}!")
         except Exception as e:
             print(f"[ShifaScribe AI] Error initializing Whisper model: {e}")
             raise e
-
-    def _pad_or_trim(self, audio: np.ndarray) -> np.ndarray:
-        """Pad or trim audio array to exactly 30 seconds (480,000 samples at 16kHz)."""
-        if len(audio) > WHISPER_N_SAMPLES:
-            audio = audio[:WHISPER_N_SAMPLES]
-        else:
-            pad_width = WHISPER_N_SAMPLES - len(audio)
-            audio = np.pad(audio, (0, pad_width), mode="constant")
-        return audio
 
     def transcribe_audio(self, file_path: str, language: Optional[str] = None) -> dict:
         """
@@ -215,28 +204,48 @@ class WhisperTranscriber:
             audio_duration = len(y) / sr
             print(f"[ShifaScribe AI] Audio loaded: {audio_duration:.2f}s, {len(y)} samples @ {sr}Hz")
 
+            # ── CRITICAL FIX: Trim trailing silence to prevent hallucination ──
+            # Whisper hallucinates when it encounters long silence (padded zeros).
+            # We trim trailing silence BEFORE chunking to reduce phantom words.
+            y = _trim_trailing_silence(y, sr)
+            trimmed_duration = len(y) / sr
+            if trimmed_duration < audio_duration - 0.5:
+                print(f"[ShifaScribe AI] Trimmed trailing silence: {audio_duration:.2f}s → {trimmed_duration:.2f}s")
+            audio_duration = trimmed_duration
+
             all_transcriptions = []
 
-            # Process in 30-second chunks for longer recordings
+            # ── Build chunks WITHOUT wasteful zero-padding ────────────────
+            # Previously: pad every chunk to 30s with zeros → Whisper hallucinates on the silence
+            # Now: pass raw audio directly to the processor, which handles mel-spectrogram padding internally.
+            # Only split into 30s chunks if audio is longer than 30s.
             if len(y) <= WHISPER_N_SAMPLES:
-                chunk = self._pad_or_trim(y)
-                chunks_to_process = [chunk]
+                chunks_to_process = [y]  # NO padding — pass raw audio
             else:
                 stride = WHISPER_SAMPLE_RATE * 25  # 25-second stride (5s overlap)
                 chunks_to_process = []
                 for start in range(0, len(y), stride):
                     end = min(start + WHISPER_N_SAMPLES, len(y))
                     chunk = y[start:end]
-                    chunk = self._pad_or_trim(chunk)
-                    chunks_to_process.append(chunk)
+                    # Only include chunks with at least 1 second of audio
+                    if len(chunk) >= WHISPER_SAMPLE_RATE:
+                        chunks_to_process.append(chunk)
 
             print(f"[ShifaScribe AI] Processing {len(chunks_to_process)} audio chunk(s)...")
 
+            # Calculate max tokens based on audio duration
+            # Rule of thumb: ~33 tokens per second of speech (generous upper bound)
+            # This prevents Whisper from generating way more text than the audio could contain
+            max_tokens_per_chunk = max(50, int(30 * 33))  # For a full 30s chunk
+
             for i, chunk in enumerate(chunks_to_process):
+                # The processor handles mel-spectrogram padding internally
+                # — no need to manually pad the raw audio to 30 seconds
                 input_features = self.processor(
                     chunk,
                     sampling_rate=WHISPER_SAMPLE_RATE,
-                    return_tensors="pt"
+                    return_tensors="pt",
+                    padding="longest",
                 ).input_features
 
                 if self.is_cuda_available:
@@ -244,17 +253,28 @@ class WhisperTranscriber:
                 else:
                     input_features = input_features.to(dtype=torch.float32)
 
-                # Anti-hallucination decoding config:
-                # - no_repeat_ngram_size=3: prevents any 3-word phrase from repeating
-                # - condition_on_prev=False: prevents hallucination cascading between chunks
-                # - num_beams=1: greedy decoding for speed
-                # - temperature=0.0: deterministic output
+                # Calculate max tokens proportional to this chunk's duration
+                chunk_duration = len(chunk) / WHISPER_SAMPLE_RATE
+                chunk_max_tokens = max(30, int(chunk_duration * 33))
+
+                # Anti-hallucination decoding config
                 gen_kwargs = {
+                    "max_new_tokens": chunk_max_tokens,
                     "num_beams": 1,
                     "temperature": 0.0,
                     "no_repeat_ngram_size": 3,
                     "condition_on_prev_tokens": False,
                 }
+
+                # Initial prompt conditioning — guides Whisper to expect medical dictation
+                try:
+                    if self._prompt_ids is not None:
+                        prompt = self._prompt_ids
+                        if self.is_cuda_available:
+                            prompt = prompt.to("cuda")
+                        gen_kwargs["prompt_ids"] = prompt.squeeze(0)
+                except Exception:
+                    pass  # If prompt fails, proceed without it
 
                 if language:
                     gen_kwargs["forced_decoder_ids"] = self.processor.get_decoder_prompt_ids(
@@ -314,3 +334,28 @@ class WhisperTranscriber:
                 "hardware": self.device_label,
                 "file_path": file_path,
             }
+
+
+def _trim_trailing_silence(audio: np.ndarray, sr: int, 
+                           top_db: int = 30, min_duration: float = 1.0) -> np.ndarray:
+    """
+    Trim trailing silence from audio to prevent Whisper from hallucinating
+    on silent padding. Keeps at least min_duration seconds of audio.
+    
+    Uses librosa's effects.trim() which detects silence based on dB threshold.
+    """
+    try:
+        # librosa.effects.trim returns (trimmed_audio, (start_index, end_index))
+        trimmed, _ = librosa.effects.trim(audio, top_db=top_db)
+        
+        # Ensure we keep at least min_duration seconds
+        min_samples = int(min_duration * sr)
+        if len(trimmed) < min_samples:
+            return audio[:max(min_samples, len(audio))]
+        
+        # Add a small buffer (0.3s) after the last detected sound
+        buffer_samples = int(0.3 * sr)
+        end_idx = min(len(trimmed) + buffer_samples, len(audio))
+        return audio[:end_idx]
+    except Exception:
+        return audio  # If trimming fails, return original
