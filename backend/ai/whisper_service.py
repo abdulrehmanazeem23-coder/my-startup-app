@@ -34,10 +34,8 @@ _LEGIT_SHORT_URDU = {
 
 # Initial prompt to guide Whisper — conditions it to expect medical dictation
 WHISPER_INITIAL_PROMPT = (
-    "Medical prescription dictation. Patient symptoms, medicines like Panadol, "
-    "Augmentin, Brufen, Cefspan, Ponstan, Flagyl, Disprin, Risek, Arinac. "
-    "Dosages in mg. Frequency like 3 times a day, 2 times a day. Duration in days. "
-    "Recheckup follow-up advice."
+    "Medical prescription: Panadol, Augmentin, Brufen, Cefspan, Ponstan, Flagyl, "
+    "Disprin, Risek, Arinac, 500mg, 200mg, TDS, BID, OD. Follow-up recheckup."
 )
 
 
@@ -216,11 +214,14 @@ class WhisperTranscriber:
                     input_features = input_features.to(dtype=torch.float32)
 
                 # Calculate max tokens proportional to ACTUAL audio duration (not padded 30s)
-                # This is the KEY anti-hallucination measure: Whisper can't generate
-                # more text than the audio could reasonably contain
-                # Rule of thumb: ~25 tokens per second of speech
+                # Ensure combined prompt + new tokens never exceed model limit (max_target_positions = 448)
+                prompt_len = self._prompt_ids.shape[-1] if self._prompt_ids is not None else 0
+                max_model_positions = getattr(self.model.config, "max_target_positions", 448)
+                max_allowed = max(30, max_model_positions - prompt_len - 32)
+
+                # ~8 tokens per second is a healthy upper bound for natural speech (~2-3 words/sec)
                 actual_chunk_duration = min(audio_duration, WHISPER_CHUNK_LENGTH)
-                chunk_max_tokens = max(50, int(actual_chunk_duration * 25))
+                chunk_max_tokens = min(max(50, int(actual_chunk_duration * 8)), max_allowed)
 
                 # Anti-hallucination decoding config
                 gen_kwargs = {
