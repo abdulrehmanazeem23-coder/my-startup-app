@@ -181,7 +181,7 @@ class WhisperTranscriber:
 
             # Pre-compute the initial prompt token IDs for conditioning
             self._prompt_ids = self.processor.get_prompt_ids(WHISPER_INITIAL_PROMPT, return_tensors="pt")
-            print(f"[ShifaScribe AI] Initial prompt loaded ({len(self._prompt_ids[0])} tokens)")
+            print(f"[ShifaScribe AI] Initial prompt loaded ({self._prompt_ids.shape[-1]} tokens)")
 
             print(f"[ShifaScribe AI] Whisper model '{self.model_name}' initialized successfully on {self.device_label}!")
         except Exception as e:
@@ -272,7 +272,8 @@ class WhisperTranscriber:
                         prompt = self._prompt_ids
                         if self.is_cuda_available:
                             prompt = prompt.to("cuda")
-                        gen_kwargs["prompt_ids"] = prompt.squeeze(0)
+                        # Ensure prompt_ids is always a 1-d tensor regardless of get_prompt_ids return shape
+                        gen_kwargs["prompt_ids"] = prompt.flatten()
                 except Exception:
                     pass  # If prompt fails, proceed without it
 
