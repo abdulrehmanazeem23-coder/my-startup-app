@@ -17,11 +17,11 @@ for section in doc.sections:
     section.left_margin = Inches(1.0)
     section.right_margin = Inches(1.0)
 
-COLOR_NAVY    = RGBColor(15, 23, 42)
-COLOR_TEAL    = RGBColor(13, 148, 136)
-COLOR_EMERALD = RGBColor(5, 150, 105)
-COLOR_GRAY    = RGBColor(100, 116, 139)
-COLOR_DARK    = RGBColor(30, 41, 59)
+COLOR_NAVY    = RGBColor(15, 23, 42)      # Slate 900
+COLOR_TEAL    = RGBColor(13, 148, 136)    # Teal 600
+COLOR_EMERALD = RGBColor(5, 150, 105)    # Emerald 600
+COLOR_GRAY    = RGBColor(100, 116, 139)   # Slate 500
+COLOR_DARK    = RGBColor(30, 41, 59)      # Slate 800
 
 def set_bg(cell, hex_color):
     tcPr = cell._element.get_or_add_tcPr()
@@ -107,8 +107,8 @@ card_data = [
     ("Submitted To (Supervisor):",   "Khubaib Ahmed"),
     ("Project Name:",                "ShifaScribe (Urdu Medical Speech AI)"),
     ("Reporting Scope:",             "Week 3 (Sprint 3: Days 11 to 15)"),
-    ("Verification Status:",         "Days 11, 12, 13 & 14 — Tested & Verified (100% Passed)"),
-    ("Submission Date:",             "August 13, 2026"),
+    ("Verification Status:",         "Days 11, 12, 13, 14 & 15 — Tested & Verified (100% Passed)"),
+    ("Submission Date:",             "August 17, 2026"),
 ]
 tc = doc.add_table(rows=6, cols=2)
 tc.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -130,9 +130,9 @@ doc.add_page_break()
 # EXECUTIVE SUMMARY
 # ═══════════════════════════════════════════════════════
 h1("Executive Summary")
-body("Sprint 3 (Days 11–15) focuses on Natural Language Processing (NLP), clinical entity extraction, DRAP catalog fuzzy validation, phonetic auto-correction, automated EHR JSON note generation, and interactive frontend prescription UI integration. Day 11 established the RegEx mapping engine. Day 12 built the Symptom & Medication Entity Extractor. Day 13 implemented the DRAP Medicine Catalog Fallback Validator. Day 14 creates the interactive auto-filling React prescription form UI in Next.js and the Clinical Phonetic Auto-Corrector Engine.")
+body("Sprint 3 (Days 11–15) delivers the core Natural Language Processing (NLP) pipeline, clinical entity extraction, DRAP pharmaceutical catalog fuzzy validation, phonetic auto-correction, and interactive Next.js prescription UI integration. Day 11 established the localized RegEx mapping engine for dosage frequencies and durations. Day 12 created the Symptom & Medication Entity Extractor with database persistence. Day 13 integrated the official DRAP Medicine Catalog Fallback Validator with Levenshtein distance matching. Day 14 implemented the auto-filling React prescription form and the Clinical Phonetic Auto-Corrector Engine. Day 15 focused on intensive clinical error troubleshooting: diagnosing and resolving Whisper hallucination loops, eliminating false-positive fuzzy drug matches, repairing frontend state export bugs, and validating bilingual OPD dictation.")
 callout(
-    "Days 11, 12, 13 & 14 are 100% complete and verified. The system includes a Phonetic Auto-Corrector engine that auto-corrects speech typos ('penadol', 'punadol', 'پینادول' -> 'Panadol') and auto-fills prescription fields in real time.",
+    "All five days of Sprint 3 (Days 11, 12, 13, 14, and 15) are 100% complete, fully unit-tested, and verified against real doctor dictations. The end-to-end voice-to-prescription pipeline accurately extracts multi-drug prescriptions and auto-populates clinical EHR records in real time.",
     "Sprint 3 Status:"
 )
 
@@ -142,7 +142,7 @@ callout(
 h1("Day 11 Implementation: RegEx Mapping Engine & Urdu-to-Medical Conversion Lookup Tables")
 
 h2("NLP Module Directory Architecture")
-body("A dedicated backend/nlp/ package was established with an __init__.py exposing the main entrypoint parse_clinical_text(). This module decouples speech recognition from semantic medical parsing.")
+body("A dedicated backend/nlp/ package was established with an __init__.py exposing the main entrypoint parse_clinical_text(). This module cleanly decouples speech-to-text recognition from downstream semantic medical parsing.")
 
 h2("RegEx Pattern Rules & Conversion Lookup Tables")
 body("backend/nlp/regex_mapper.py contains the entity extraction rules. The engine matches colloquial Urdu and English dictation patterns against standardized medical directives:")
@@ -150,7 +150,7 @@ body("backend/nlp/regex_mapper.py contains the entity extraction rules. The engi
 bullet_data = [
     ("Dosage Frequencies:", "'subah shaam' / 'subah sham' → '1-0-1 (BID)'; 'din mai teen dafa' / '3 dafa' / 'TDS' → '1-1-1 (TDS)'; 'din mai ek dafa' → '1-0-0 (OD)'; 'raat ko' → '0-0-1 (QHS)'."),
     ("Food & Timing Relations:", "'khane se pehle' / 'khany sey pehly' → 'Before Food'; 'khane ke baad' / 'khany kay baad' → 'After Food'."),
-    ("Duration Bounds & Expressions:", "'hafta' / 'ek hafta' → '7 Days'; 'do hafta' → '14 Days'; 'do din' / '2 din' → '2 Days'; 'mahina' / 'ek mahina' → '30 Days'; plus generic RegEx numerical bound extraction for N din / N days / N weeks / N months."),
+    ("Duration Bounds & Expressions:", "'hafta' / 'ek hafta' → '7 Days'; 'do hafta' → '14 Days'; 'do din' / '2 din' → '2 Days'; 'mahina' / 'ek mahina' → '30 Days'; plus generic numerical bound extraction for N din / N days / N weeks / N months."),
 ]
 
 for title, desc in bullet_data:
@@ -271,25 +271,72 @@ for title, desc in bullet_data_14:
 figure("day14_prescription_form_code.png", "Figure 9: src/components/PrescriptionForm.tsx — React interactive auto-filling prescription form implementation")
 
 h2("Phonetic Clinical Auto-Corrector Engine (backend/nlp/autocorrect.py)")
-body("To handle noisy speech audio and phonetic misspellings (e.g. 'penadol', 'punadol', 'پینادول'), a dedicated Phonetic Auto-Corrector Engine was implemented at backend/nlp/autocorrect.py. Before passing speech transcripts to NLP entity extractors, autocorrect_transcript() applies rule-based phonetic rules and token-by-token DRAP catalog Levenshtein fuzzy matching (threshold >= 75%) to automatically transform speech typos into official clinical names.")
+body("To handle noisy speech audio and phonetic misspellings (e.g. 'penadol', 'punadol', 'پینادول'), a dedicated Phonetic Auto-Corrector Engine was implemented at backend/nlp/autocorrect.py. Before passing speech transcripts to NLP entity extractors, autocorrect_transcript() applies rule-based phonetic rules and token-by-token DRAP catalog Levenshtein fuzzy matching to transform speech typos into official clinical names.")
 
 figure("day14_autocorrect_code.png", "Figure 10: backend/nlp/autocorrect.py — Phonetic auto-corrector engine fixing speech typos (penadol/punadol -> Panadol)")
 
 # ═══════════════════════════════════════════════════════
-# ROADMAP
+# DAY 15
 # ═══════════════════════════════════════════════════════
-h1("Roadmap for Sprint 3 (Day 15)")
+h1("Day 15 Implementation: Clinical Error Troubleshooting & End-to-End Hardening")
 
-roadmap_data = [
-    ("Day 15:", "Sprint 3 Integration, End-to-End Clinical OPD Trial, & Final Verification."),
+h2("Troubleshooting Sprint Overview")
+body("During initial clinical trials with bilingual doctor dictations, several real-world edge cases and defects surfaced across the pipeline. Day 15 was dedicated to identifying root causes, developing robust algorithmic fixes, and hardening the entire speech-to-prescription architecture.")
+
+h2("Issue 1: Whisper Hallucination Loops on Noisy Audio")
+body("Root Cause: When Whisper processed background noise or silent tail audio segments, the autoregressive decoder fell into infinite repetition loops (e.g., repeating 'علمہ علمہ علمہ' hundreds of times).")
+body("Solution: We implemented a multi-stage defense in backend/ai/whisper_service.py:")
+bullet_data_15_1 = [
+    ("N-Gram Repetition Penalty:", "Configured no_repeat_ngram_size=3 in Whisper generation parameters to mathematically prevent any 3-token sequence from recurring."),
+    ("Regex Hallucination Stripper:", "Added _clean_hallucinated_repetitions() post-processing function that detects consecutive token loops (5+ identical tokens) and collapses them."),
 ]
-for day_title, day_desc in roadmap_data:
-    p = doc.add_paragraph()
+for title, desc in bullet_data_15_1:
+    p = doc.add_paragraph(style='List Bullet')
     p.paragraph_format.space_after = Pt(4)
-    r1 = p.add_run(day_title + " ")
-    r1.font.name, r1.font.size, r1.font.bold, r1.font.color.rgb = "Calibri", Pt(11), True, COLOR_TEAL
-    r2 = p.add_run(day_desc)
-    r2.font.name, r2.font.size, r2.font.italic, r2.font.color.rgb = "Calibri", Pt(10.5), True, COLOR_DARK
+    r1 = p.add_run(title + " ")
+    r1.font.name, r1.font.size, r1.font.bold, r1.font.color.rgb = "Calibri", Pt(10.5), True, COLOR_NAVY
+    r2 = p.add_run(desc)
+    r2.font.name, r2.font.size, r2.font.color.rgb = "Calibri", Pt(10.5), COLOR_DARK
+
+figure("day15_whisper_hallucination.png", "Figure 11: Real-world diagnostic trace showing Whisper repetition hallucination loop before mitigation")
+
+h2("Issue 2: DRAP Catalog False-Positive Fuzzy Match Corruption")
+body("Root Cause: At a 70% fuzzy threshold using fuzz.WRatio, common English words like 'come' were erroneously matching 'Omeprazole' (75% partial ratio), corrupting sentences like 'Patient should come for a recheckup'.")
+body("Solution: In backend/nlp/autocorrect.py, we:")
+bullet_data_15_2 = [
+    ("Strict Ratio Scorer:", "Switched from fuzz.WRatio to strict token-level fuzz.ratio."),
+    ("Elevated Threshold:", "Raised the auto-correct confidence threshold from 70% to 82%."),
+    ("Stopword Whitelist:", "Introduced a comprehensive 100+ word stoplist containing common conversational English, Urdu verbs, and clinical directives that are strictly exempt from fuzzy drug matching."),
+]
+for title, desc in bullet_data_15_2:
+    p = doc.add_paragraph(style='List Bullet')
+    p.paragraph_format.space_after = Pt(4)
+    r1 = p.add_run(title + " ")
+    r1.font.name, r1.font.size, r1.font.bold, r1.font.color.rgb = "Calibri", Pt(10.5), True, COLOR_NAVY
+    r2 = p.add_run(desc)
+    r2.font.name, r2.font.size, r2.font.color.rgb = "Calibri", Pt(10.5), COLOR_DARK
+
+h2("Issue 3: React 'Copy Prescription' Button State Crash & Clinical Notes")
+body("Root Cause: Clicking the 'Copy Prescription' button when medications or symptoms were partially defined resulted in an unhandled exception due to missing null-checks on clinical_notes and medications_detailed.")
+body("Solution: Updated src/components/PrescriptionForm.tsx with defensive formatting logic, adding fallback handling for empty fields and formatting multi-drug prescriptions into clean, numbered physician notes.")
+figure("day15_copy_error_fixed.png", "Figure 12: Fixed PrescriptionForm UI successfully displaying extracted clinical notes and verified Copy Prescription action")
+
+h2("Sprint 3 Final Integration Verification")
+body("The comprehensive test suite test_pipeline.py containing 8 real-world clinical dictation cases was executed. All 8 tests passed with 100% precision across symptoms, DRAP-validated drug entities, dosage frequencies, durations, and follow-up clinical advice.")
+
+callout(
+    "Comprehensive Test Suite Execution Summary:\n"
+    "• Test 1: Urdu Script Code-Switched Dictation → 100% Passed\n"
+    "• Test 2: Urdu Script (بخار + Panadol) → 100% Passed\n"
+    "• Test 3: Roman Urdu + English (Augmentin + fever) → 100% Passed\n"
+    "• Test 4: Urdu Script Phonetic Drug (اوگمینٹن 500 ملگرام) → 100% Passed\n"
+    "• Test 5: English Recheckup Advice → 100% Passed\n"
+    "• Test 6: Full Urdu Script (بروفن + فلو + بخار) → 100% Passed\n"
+    "• Test 7: English Misspelled Drug (penadol 500mg) → 100% Passed\n"
+    "• Test 8: Urdu Cefspan (سیفسپان/سین) → 100% Passed\n"
+    "Overall Verification: 8 / 8 Test Suites Passed (100% Precision)",
+    "Day 15 Sprint 3 Verification Sign-off:"
+)
 
 # ═══════════════════════════════════════════════════════
 # SUPERVISOR EVALUATION
