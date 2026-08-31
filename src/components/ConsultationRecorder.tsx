@@ -198,24 +198,48 @@ export default function ConsultationRecorder({
     setTaskId(null);
 
     console.log(
-      "[ShifaScribe Compression] Requesting microphone access with 16kHz Mono constraints..."
+      "[ShifaScribe Compression] Requesting microphone access..."
     );
 
-    const audioConstraints: MediaStreamConstraints = {
-      audio: {
-        sampleRate: 16000,
-        channelCount: 1,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    };
+    if (typeof window === "undefined" || !navigator?.mediaDevices?.getUserMedia) {
+      setErrorMessage(
+        "Microphone access is not supported by your browser or environment. Please ensure you are accessing via http://localhost:3000 or HTTPS."
+      );
+      return;
+    }
+
+    let stream: MediaStream | null = null;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(audioConstraints);
+      // Tier 1: Try with clean audio processing constraints
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+      } catch (tier1Err: any) {
+        console.warn(
+          "[ShifaScribe Compression] Tier 1 audio constraints failed, falling back to basic audio...",
+          tier1Err
+        );
+        // If user explicitly denied permission, don't retry, rethrow to catch block
+        if (tier1Err.name === "NotAllowedError" || tier1Err.name === "PermissionDeniedError") {
+          throw tier1Err;
+        }
+        // Tier 2: Basic microphone fallback
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+
+      if (!stream) {
+        throw new Error("Unable to obtain audio stream from microphone.");
+      }
+
       streamRef.current = stream;
       console.log(
-        "[ShifaScribe Compression] Microphone permission granted! Applied constraints: 16kHz sample rate, 1 (Mono) channel."
+        "[ShifaScribe Compression] Microphone permission granted! Stream active."
       );
 
       const preferredMimeTypes = [
@@ -226,14 +250,26 @@ export default function ConsultationRecorder({
       ];
 
       const selectedMimeType =
-        preferredMimeTypes.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+        preferredMimeTypes.find(
+          (type) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)
+        ) || "";
 
       console.log(
-        `[ShifaScribe Compression] Selected browser MIME type: ${selectedMimeType}`
+        `[ShifaScribe Compression] Selected browser MIME type: ${selectedMimeType || "browser default"}`
       );
 
-      const options = selectedMimeType ? { mimeType: selectedMimeType } : undefined;
-      const mediaRecorder = new MediaRecorder(stream, options);
+      let mediaRecorder: MediaRecorder;
+      try {
+        const options = selectedMimeType ? { mimeType: selectedMimeType } : undefined;
+        mediaRecorder = new MediaRecorder(stream, options);
+      } catch (mimeErr) {
+        console.warn(
+          "[ShifaScribe Compression] MediaRecorder failed with selected MIME, falling back to default...",
+          mimeErr
+        );
+        mediaRecorder = new MediaRecorder(stream);
+      }
+
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event: BlobEvent) => {
@@ -274,7 +310,7 @@ export default function ConsultationRecorder({
           streamRef.current = null;
         }
 
-        // Day 9: Immediately upload to FastAPI Whisper pipeline
+        // Immediately upload to FastAPI Whisper pipeline
         uploadAndTranscribe(blob, blob.type || finalBlobType);
 
         setTimeout(() => {
@@ -293,7 +329,7 @@ export default function ConsultationRecorder({
       console.error("[ShifaScribe Compression] Error accessing microphone:", err);
       setErrorMessage(
         err.name === "NotAllowedError" || err.name === "PermissionDeniedError"
-          ? "Microphone access denied. Please allow microphone permissions in your browser bar."
+          ? "Microphone access denied. Please allow microphone permissions in your browser address bar and reload."
           : `Failed to initialize microphone: ${err.message || err}`
       );
       updateState("idle");
