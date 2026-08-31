@@ -20,7 +20,12 @@ interface ConsultationRecorderProps {
   ) => void;
 }
 
-const BACKEND_URL = "http://localhost:8000";
+const getBackendUrl = () => {
+  if (typeof window !== "undefined") {
+    return `http://${window.location.hostname || "localhost"}:8000`;
+  }
+  return "http://localhost:8000";
+};
 
 export default function ConsultationRecorder({
   onStateChange,
@@ -109,8 +114,9 @@ export default function ConsultationRecorder({
         `[ShifaScribe Day 9] Uploading ${(blob.size / 1024).toFixed(1)} KB audio blob to FastAPI...`
       );
 
+      const backendUrl = getBackendUrl();
       const uploadRes = await fetch(
-        `${BACKEND_URL}/api/consultation/upload-audio`,
+        `${backendUrl}/api/consultation/upload-audio`,
         {
           method: "POST",
           body: formData,
@@ -141,7 +147,7 @@ export default function ConsultationRecorder({
 
         try {
           const statusRes = await fetch(
-            `${BACKEND_URL}/api/consultation/status/${returnedTaskId}`
+            `${backendUrl}/api/consultation/status/${returnedTaskId}`
           );
           const statusData = await statusRes.json();
           const currentStatus = statusData.status;
@@ -202,8 +208,11 @@ export default function ConsultationRecorder({
     );
 
     if (typeof window === "undefined" || !navigator?.mediaDevices?.getUserMedia) {
+      const isIpAccess = typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1";
       setErrorMessage(
-        "Microphone access is not supported by your browser or environment. Please ensure you are accessing via http://localhost:3000 or HTTPS."
+        isIpAccess
+          ? `Microphone is blocked on insecure IP (${window.location.hostname}). Chrome requires http://localhost:3000 for microphone permissions. Please open http://localhost:3000 in your browser!`
+          : "Microphone access is not supported by your browser or environment. Please ensure you are accessing via http://localhost:3000 or HTTPS."
       );
       return;
     }
