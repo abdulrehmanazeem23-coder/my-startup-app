@@ -72,21 +72,24 @@ WORD_TO_NUM = {
     "tees": 30, "thirty": 30, "30": 30, "تیس": 30,
 }
 
-# Explicit Duration Idioms Mapping
+# Explicit Duration Idioms Mapping (Ordered longest-match first with boundary safety)
 EXPLICIT_DURATION_MAP = [
     (r"\b(ek\s+hafta|1\s+hafta|one\s+week|hafta|ہفتہ|ایک\s*ہفتہ)\b", "7 Days"),
     (r"\b(do\s+hafta|2\s+hafta|do\s+hafte|2\s+hafte|two\s+weeks|2\s+weeks|دو\s*ہفتے)\b", "14 Days"),
     (r"\b(teen\s+hafta|3\s+hafta|three\s+weeks|3\s+weeks)\b", "21 Days"),
     (r"\b(ek\s+mahina|1\s+mahina|one\s+month|1\s+month|mahina|مہینہ|ایک\s*مہینہ)\b", "30 Days"),
     (r"\b(do\s+mahina|2\s+mahina|two\s+months|2\s+months|دو\s*مہینے)\b", "60 Days"),
-    (r"(?:ek\s+din|1\s+din|1\s*دن|ایک\s*دن|one\s+day|1\s+day)", "1 Day"),
-    (r"(?:do\s+din|2\s+din|2\s*دن|دو\s*دن|two\s+days|2\s+days)", "2 Days"),
-    (r"(?:teen\s+din|3\s+din|3\s*دن|تین\s*دن|three\s+days|3\s+days)", "3 Days"),
-    (r"(?:char\s+din|4\s+din|4\s*دن|چار\s*دن|four\s+days|4\s+days)", "4 Days"),
-    (r"(?:paanch\s+din|panch\s+din|5\s+din|5\s*دن|پانچ\s*دن|five\s+days|5\s+days)", "5 Days"),
-    (r"(?:saat\s+din|7\s+din|7\s*دن|سات\s*دن|seven\s+days|7\s+days)", "7 Days"),
-    (r"(?:das\s+din|10\s+din|10\s*دن|دس\s*دن|ten\s+days|10\s+days)", "10 Days"),
-    (r"(?:pandrah\s+din|15\s+din|15\s*دن|پندرہ\s*دن|fifteen\s+days|15\s+days)", "15 Days"),
+    (r"(?<!\d)(?:30\s+days|30\s+din|30\s*دن|tees\s+din|thirty\s+days)(?!\d)", "30 Days"),
+    (r"(?<!\d)(?:20\s+days|20\s+din|20\s*دن|bees\s+din|twenty\s+days)(?!\d)", "20 Days"),
+    (r"(?<!\d)(?:15\s+days|15\s+din|15\s*دن|پندرہ\s*دن|pandrah\s+din|fifteen\s+days)(?!\d)", "15 Days"),
+    (r"(?<!\d)(?:14\s+days|14\s+din|14\s*دن|chaudah\s+din|fourteen\s+days)(?!\d)", "14 Days"),
+    (r"(?<!\d)(?:10\s+days|10\s+din|10\s*دن|دس\s*دن|das\s+din|ten\s+days)(?!\d)", "10 Days"),
+    (r"(?<!\d)(?:7\s+days|7\s+din|7\s*دن|سات\s*دن|saat\s+din|seven\s+days)(?!\d)", "7 Days"),
+    (r"(?<!\d)(?:5\s+days|5\s+din|5\s*دن|پانچ\s*دن|paanch\s+din|panch\s+din|five\s+days)(?!\d)", "5 Days"),
+    (r"(?<!\d)(?:4\s+days|4\s+din|4\s*دن|چار\s*دن|char\s+din|four\s+days)(?!\d)", "4 Days"),
+    (r"(?<!\d)(?:3\s+days|3\s+din|3\s*دن|تین\s*دن|teen\s+din|three\s+days)(?!\d)", "3 Days"),
+    (r"(?<!\d)(?:2\s+days|2\s+din|2\s*دن|دو\s*دن|do\s+din|two\s+days)(?!\d)", "2 Days"),
+    (r"(?<!\d)(?:1\s+day|1\s+din|1\s*دن|ایک\s*دن|ek\s+din|one\s+day)(?!\d)", "1 Day"),
 ]
 
 
