@@ -16,27 +16,27 @@ from typing import Dict, Optional
 FREQUENCY_PATTERNS = [
     # TDS (Three Times Daily)
     (
-        r"\b(din\s+(?:mai|mein|mian)\s+(?:teen|3)\s+(?:dafa|time|times|طیم|مرتبہ|بار)|(?:teen|3)\s+(?:dafa|time|times|طیم|مرتبہ|بار)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*(?:تین|3|۳)\s*(?:دفعہ|ٹائم|طائم|طیم|مرتبہ|بار)|تین\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|[3۳]\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|(?:3|three|teen)\s+times?(?:\s+a\s+day|\s+daily)?|tds|t\.d\.s|three\s+times\s+a\s+day)\b",
+        r"\b(din\s+(?:mai|mein|mian)\s+(?:teen|3)\s+(?:dafa|time|times|طیم|مرتبہ|بار)|(?:teen|3)\s+(?:dafa|time|times|طیم|مرتبہ|بار)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*(?:تین|3|۳)\s*(?:دفعہ|ٹائم|طائم|طیم|مرتبہ|بار)|تین\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|[3۳]\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|(?:3|three|teen)\s+times?(?:\s+a\s+day|\s+daily)?|three\s+times\s+a\s+day|thrice(?:\s+daily|\s+a\s+day)?|tds|t\.d\.s)\b",
         "1-1-1 (TDS)",
     ),
     # BID (Twice Daily)
     (
-        r"\b(subah\s+o?\s*shaam|subah\s+sham|subah\s+o?\s*shaam|صبح\s*شام|صبح\s*و\s*شام|din\s+(?:mai|mein|mian)\s+(?:do|2)\s+(?:dafa|time|times|طیم|مرتبہ|بار)|(?:do|2)\s+(?:dafa|time|times|طیم|مرتبہ|بار)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*(?:دو|2|۲)\s*(?:دفعہ|ٹائم|طائم|طیم|مرتبہ|بار)|دو\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|[2۲]\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|(?:2|two|do)\s+times?(?:\s+a\s+day|\s+daily)?|twice(?:\s+daily|\s+a\s+day)?|bid|b\.i\.d|twice\s+daily)\b",
+        r"\b(subah\s+o?\s*shaam|subah\s+sham|صبح\s*شام|صبح\s*و\s*شام|din\s+(?:mai|mein|mian)\s+(?:do|2)\s+(?:dafa|time|times|طیم|مرتبہ|بار)|(?:do|2)\s+(?:dafa|time|times|طیم|مرتبہ|بار)\s*(?:din\s+(?:mai|mein))?|دن\s*میں\s*(?:دو|2|۲)\s*(?:دفعہ|ٹائم|طائم|طیم|مرتبہ|بار)|دو\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|[2۲]\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|(?:2|two|do)\s+times?(?:\s+a\s+day|\s+daily)?|two\s+times\s+a\s+day|twice(?:\s+daily|\s+a\s+day)?|bid|b\.i\.d)\b",
         "1-0-1 (BID)",
     ),
     # OD (Once Daily)
     (
-        r"\b(din\s+(?:mai|mein|mian)\s+(?:ek|1)\s+(?:dafa|time|times|طیم|مرتبہ|بار)|(?:ek|1)\s+(?:dafa|time|times|طیم|مرتبہ|بار)\s*(?:din\s+(?:mai|mein))?|ایک\s*(?:دفعہ|مرتبہ|بار)\s*دن\s*میں|دن\s*میں\s*ایک\s*(?:دفعہ|مرتبہ|بار)|ایک\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|[1۱]\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|(?:1|one|ek)\s+times?(?:\s+a\s+day|\s+daily)?|once(?:\s+daily|\s+a\s+day)?|روزانہ|od|o\.d|once\s+daily)\b",
+        r"\b(din\s+(?:mai|mein|mian)\s+(?:ek|1)\s+(?:dafa|time|times|طیم|مرتبہ|بار)|(?:ek|1)\s+(?:dafa|time|times|طیم|مرتبہ|بار)\s*(?:din\s+(?:mai|mein))?|ایک\s*(?:دفعہ|مرتبہ|بار)\s*دن\s*میں|دن\s*میں\s*ایک\s*(?:دفعہ|مرتبہ|بار)|ایک\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|[1۱]\s*(?:ٹائم|طائم|طیم|مرتبہ|بار)|(?:1|one|ek)\s+times?(?:\s+a\s+day|\s+daily)?|one\s+time\s+a\s+day|once(?:\s+daily|\s+a\s+day)?|روزانہ|od|o\.d)\b",
         "1-0-0 (OD)",
     ),
-    # QHS (Nightly)
+    # QHS (Nightly / At bedtime)
     (
-        r"\b(raat\s+ko(?:\s+ek\s+dafa)?|راات\s*کو|رات\s*کو|qhs|q\.h\.s|nightly)\b",
+        r"\b(raat\s+ko(?:\s+ek\s+dafa)?|راات\s*کو|رات\s*کو|at\s+bedtime|bedtime|nightly|at\s+night|qhs|q\.h\.s)\b",
         "0-0-1 (QHS)",
     ),
     # Q8H (Every 8 hours)
     (
-        r"\b(har\s+(?:8|aath)\s+(?:ghante|ghente|hours?)|q8h|q\.8\.h)\b",
+        r"\b(har\s+(?:8|aath)\s+(?:ghante|ghente|hours?)|every\s+8\s+hours?|q8h|q\.8\.h)\b",
         "Every 8 Hours (Q8H)",
     ),
 ]
@@ -75,15 +75,18 @@ WORD_TO_NUM = {
 # Explicit Duration Idioms Mapping
 EXPLICIT_DURATION_MAP = [
     (r"\b(ek\s+hafta|1\s+hafta|one\s+week|hafta|ہفتہ|ایک\s*ہفتہ)\b", "7 Days"),
-    (r"\b(do\s+hafta|2\s+hafta|do\s+hafte|2\s+hafte|two\s+weeks|دو\s*ہفتے)\b", "14 Days"),
-    (r"\b(teen\s+hafta|3\s+hafta|three\s+weeks)\b", "21 Days"),
-    (r"\b(ek\s+mahina|1\s+mahina|one\s+month|mahina|مہینہ|ایک\s*مہینہ)\b", "30 Days"),
-    (r"\b(do\s+mahina|2\s+mahina|two\s+months|دو\s*مہینے)\b", "60 Days"),
-    (r"(?:do\s+din|2\s+din|2\s*دن|دو\s*دن)", "2 Days"),
-    (r"(?:teen\s+din|3\s+din|3\s*دن|تین\s*دن)", "3 Days"),
-    (r"(?:char\s+din|4\s+din|4\s*دن|چار\s*دن)", "4 Days"),
-    (r"(?:paanch\s+din|5\s+din|5\s*دن|پانچ\s*دن)", "5 Days"),
-    (r"(?:saat\s+din|7\s+din|7\s*دن|سات\s*دن)", "7 Days"),
+    (r"\b(do\s+hafta|2\s+hafta|do\s+hafte|2\s+hafte|two\s+weeks|2\s+weeks|دو\s*ہفتے)\b", "14 Days"),
+    (r"\b(teen\s+hafta|3\s+hafta|three\s+weeks|3\s+weeks)\b", "21 Days"),
+    (r"\b(ek\s+mahina|1\s+mahina|one\s+month|1\s+month|mahina|مہینہ|ایک\s*مہینہ)\b", "30 Days"),
+    (r"\b(do\s+mahina|2\s+mahina|two\s+months|2\s+months|دو\s*مہینے)\b", "60 Days"),
+    (r"(?:ek\s+din|1\s+din|1\s*دن|ایک\s*دن|one\s+day|1\s+day)", "1 Day"),
+    (r"(?:do\s+din|2\s+din|2\s*دن|دو\s*دن|two\s+days|2\s+days)", "2 Days"),
+    (r"(?:teen\s+din|3\s+din|3\s*دن|تین\s*دن|three\s+days|3\s+days)", "3 Days"),
+    (r"(?:char\s+din|4\s+din|4\s*دن|چار\s*دن|four\s+days|4\s+days)", "4 Days"),
+    (r"(?:paanch\s+din|panch\s+din|5\s+din|5\s*دن|پانچ\s*دن|five\s+days|5\s+days)", "5 Days"),
+    (r"(?:saat\s+din|7\s+din|7\s*دن|سات\s*دن|seven\s+days|7\s+days)", "7 Days"),
+    (r"(?:das\s+din|10\s+din|10\s*دن|دس\s*دن|ten\s+days|10\s+days)", "10 Days"),
+    (r"(?:pandrah\s+din|15\s+din|15\s*دن|پندرہ\s*دن|fifteen\s+days|15\s+days)", "15 Days"),
 ]
 
 

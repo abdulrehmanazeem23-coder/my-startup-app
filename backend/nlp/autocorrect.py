@@ -14,7 +14,8 @@ DRAP_CATALOG = [
     "Metronidazole", "Disprin", "Aspirin", "Rigix", "Softin", "Arinac",
     "Ponstan", "Surbex", "Omeprazole", "Risek", "Gravinate", "Entamizole",
     "Zantac", "Cefspan", "Klaricid", "Azomax", "Basogabin", "Cipro", "Ciprofloxacin",
-    "Secnidazole", "Gaviscon", "Calpol", "Arinate", "Famotidine", "Loratadine", "Cetirizine"
+    "Secnidazole", "Gaviscon", "Calpol", "Arinate", "Famotidine", "Loratadine", "Cetirizine",
+    "Motilium", "Domperidone", "Buscopan", "Leflox", "Levofloxacin", "Tramal"
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -24,11 +25,13 @@ DRAP_CATALOG = [
 PRE_PROCESS_RULES = [
     # Strip trailing Urdu characters attached to English drug names
     # e.g. "Augmentinڈ" → "Augmentin", "Panadolک" → "Panadol"
-    (r"\b(Augmentin|Panadol|Brufen|Cefspan|Ponstan|Flagyl|Disprin|Risek|Arinac|Omeprazole|Cipro|Klaricid|Azomax)[^\s\w]*[\u0600-\u06FF]+", r"\1"),
+    (r"\b(" + "|".join(DRAP_CATALOG) + r")[^\s\w]*[\u0600-\u06FF]+", r"\1"),
     # Separate joined Urdu number-word combos: "چاردنڑ" → "چار دن"
-    (r"(چار|تین|دو|پانچ|سات|ایک)(دن[ڑ]?)", r"\1 دن"),
+    (r"(چار|تین|دو|پانچ|سات|ایک|دس)(دن[ڑ]?)", r"\1 دن"),
     # "دورو ٹائم" → "دو ٹائم" (Whisper adds ر to دو)
-    (r"دورو\s*(?=ٹائم|طائم|طایم|طاہم)", "دو "),
+    (r"دورو\s*(?=ٹائم|طائم|طایم|طاہم|ٹایم)", "دو "),
+    # Normalize spaced units: 500 mg -> 500mg, 200 mg -> 200mg
+    (r"(\d+)\s+(mg|g|ml|mcg)\b", r"\1\2"),
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -47,37 +50,64 @@ CLINICAL_AUTOCORRECT_RULES = [
     (r"(?:پیراسیٹامول|پراسیٹامول|پراسیٹمول|پیرسیٹامول)", "Paracetamol"),
     (r"\b(paracetmol|paracetamal|parasitamol|paracetamole)\b", "Paracetamol"),
 
+    # Calpol
+    (r"(?:کالپول|کیلپول)\b", "Calpol"),
+    (r"\b(calpole|kalpol|calpal)\b", "Calpol"),
+
     # Augmentin: ALL known Whisper phonetic outputs
     # اگمانٹن, مائنٹن, اوڈ مائنٹن, etc.
-    (r"(?:اوڈ\s*)?(?:مائنٹن|اگمانٹن|اوگمینٹن|اوگمنٹن|اوگمنٹین|اگمنٹن|اگمنٹین|اگمینٹن|اگمینٹین|آگمنٹن|آگمینٹن|اسکا\s*بم|اسکھابم|اسکابم|اوگمانٹن|آگمانٹن|مینٹن|مائنٹین)", "Augmentin"),
-    (r"\b(augmenten|augmentun|aggmentin|ogmentin|augmantin|agmentin|augmanti|agmantin)\b", "Augmentin"),
+    (r"(?:اوڈ\s*)?(?:مائنٹن|مائنٹین|اگمانٹن|اوگمینٹن|اوگمنٹن|اوگمنٹین|اگمنٹن|اگمنٹین|اگمینٹن|اگمینٹین|آگمنٹن|آگمینٹن|اگمنٹون|اوگمنٹون|اسکا\s*بم|اسکھابم|اسکابم|اوگمانٹن|آگمانٹن|مینٹن)", "Augmentin"),
+    (r"\b(augmenten|augmentun|aggmentin|ogmentin|augmantin|agmentin|augmanti|agmantin|ogmantin)\b", "Augmentin"),
 
     # Brufen
     (r"(?:بروفن|بروفین|ابروفن|بروفان)", "Brufen"),
-    (r"\b(brofen|bruffen|bruphen|broofen)\b", "Brufen"),
+    (r"\b(brofen|bruffen|bruphen|broofen|brufin)\b", "Brufen"),
 
     # Ponstan
     (r"(?:پونسٹان|پونسٹین|پونستان|پانسٹان)", "Ponstan"),
-    (r"\b(ponsten|ponstaan)\b", "Ponstan"),
+    (r"\b(ponsten|ponstaan|ponston)\b", "Ponstan"),
 
     # Disprin
     (r"(?:ڈسپرین|ڈیسپرین|دسپرین)", "Disprin"),
-    (r"\b(dispren|desprin|dispreen)\b", "Disprin"),
+    (r"\b(dispren|desprin|dispreen|disprin)\b", "Disprin"),
 
     # Flagyl
     (r"(?:فلیجل|فلائیجل|فلاجل|فلیجیل)", "Flagyl"),
-    (r"\b(flygyl|flgyl|flagil|flajil)\b", "Flagyl"),
+    (r"\b(flygyl|flgyl|flagil|flajil|flegel)\b", "Flagyl"),
 
-    # Cefspan
+    # Cefspan / Cefixime
     (r"(?:سین|سینو|سائن|سیفیکزیم|سیفپین|سیفسیپان|سیفسپان|سیفسپن)", "Cefspan"),
+    (r"\b(cefspan|cefixime|cefspan)\b", "Cefspan"),
 
-    # Risek
+    # Risek / Omeprazole
     (r"(?:رائزک|رائزیک|ریزک|رسیک)", "Risek"),
+    (r"\b(rizek|raizek|raisek|riseck)\b", "Risek"),
+    (r"(?:اومیپرازول|امیپرازول)", "Omeprazole"),
 
     # Arinac / Surbex / Gravinate
     (r"(?:آرینیک|ارینیک|آرینک|ارینک)", "Arinac"),
+    (r"\b(arinak|arnac)\b", "Arinac"),
     (r"(?:سوربیکس|سربیکس)", "Surbex"),
     (r"(?:گریوینیٹ|گروینیٹ)", "Gravinate"),
+
+    # Rigix / Softin
+    (r"(?:رجکس|ریجکس|رگکس|سیٹریزین|سٹریزین)\b", "Rigix"),
+    (r"\b(rigx|regix|cetrizine|setrizine)\b", "Rigix"),
+    (r"(?:سوفٹن|سافٹن|لوراٹاڈین)\b", "Softin"),
+    (r"\b(soften|loratadine)\b", "Softin"),
+
+    # Gaviscon
+    (r"(?:گیوسکان|گیویسکان|گاویسکان)\b", "Gaviscon"),
+    (r"\b(gaviscon|gavison)\b", "Gaviscon"),
+
+    # Klaricid / Azomax
+    (r"(?:کلاریسیڈ|کلاریسڈ|کلیریکیڈ)\b", "Klaricid"),
+    (r"\b(claricid|klaracid|claracid)\b", "Klaricid"),
+    (r"(?:ایزوماکس|ازوماکس|ایزومیکس)\b", "Azomax"),
+    (r"\b(azomax|azimax|azomx)\b", "Azomax"),
+
+    # Entamizole
+    (r"(?:انٹامیزول|اینٹامیزول|انٹامزول)\b", "Entamizole"),
 
     # ── 2. Dosage Units (Urdu Script → English) ─────────────────────────
     # مج / ملے گرام / ملکران / ملگرام are all common Whisper outputs for "mg"
@@ -101,6 +131,7 @@ CLINICAL_AUTOCORRECT_RULES = [
     (r"چار\s*(?:دین|دنے|دن)\b", "4 din"),
     (r"پانچ\s*(?:دین|دنے|دن)\b", "5 din"),
     (r"سات\s*(?:دین|دنے|دن)\b", "7 din"),
+    (r"دس\s*(?:دین|دنے|دن)\b", "10 din"),
     # "اردن" / "ارڈن" = garbled "4 din" from Whisper
     (r"(?:اردن|ارڈن)\s*کے?\s*لیے", "4 din کے لیے"),
 
@@ -156,7 +187,7 @@ def autocorrect_transcript(text: str) -> str:
         "they", "this", "those", "through", "time", "times", "told", "took", "turn",
         "under", "until", "upon", "very", "want", "well", "went", "were", "what",
         "when", "where", "which", "while", "whom", "will", "with", "work", "would",
-        "year", "your", "above", "should", "could", "their", "severe",
+        "year", "your", "above", "should", "could", "their", "severe", "whose",
         # Medical/clinical context words
         "patient", "headache", "fever", "cough", "pain", "tablet",
         "capsule", "syrup", "injection", "prescribed", "daily", "weeks", "months",
