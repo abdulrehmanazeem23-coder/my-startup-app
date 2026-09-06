@@ -219,17 +219,27 @@ def extract_medications_detailed(clean_text: str) -> Tuple[List[str], List[Dict[
             seen_drugs.add(drug_key)
             unique_spans.append(d)
 
-    # Locate boundary where follow-up advice / recheckup begins
-    advice_pattern = r"(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ|دوارہ|چکپ|اچھا\s*کب|چک\s*کب)"
-    advice_match = re.search(advice_pattern, clean_text, re.IGNORECASE)
-    advice_start = advice_match.start() if advice_match else len(clean_text)
+    advice_pattern = r"(?:dobara|recheckup|re-checkup|visit|چیکپ|وزٹ|چیکٹ|دوارہ|چکپ|اچھا\s*کب|چک\s*کب)"
 
     medications_detailed = []
     medications_display = []
 
     for idx, d in enumerate(unique_spans):
         seg_start = d["start"]
-        seg_end = unique_spans[idx + 1]["start"] if idx + 1 < len(unique_spans) else advice_start
+        if idx + 1 < len(unique_spans):
+            seg_end = unique_spans[idx + 1]["start"]
+        else:
+            # For the last drug, look for advice boundary strictly in the text that follows this drug
+            post_drug_text = clean_text[d["end"]:]
+            post_advice_match = re.search(advice_pattern, post_drug_text, re.IGNORECASE)
+            if post_advice_match:
+                seg_end = d["end"] + post_advice_match.start()
+            else:
+                seg_end = len(clean_text)
+
+        if seg_end <= seg_start:
+            seg_end = len(clean_text)
+
         seg_text = clean_text[seg_start:seg_end]
 
         # Parse frequency, duration, food relation within this specific drug segment
