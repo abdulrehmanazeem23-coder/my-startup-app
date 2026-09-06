@@ -51,3 +51,54 @@
   50% { transform: translateX(60%); width: 60%; }
   100% { transform: translateX(200%); width: 60%; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   DEDICATED A4 & THERMAL CLINICAL PRESCRIPTION PRINT STYLESHEET
+   ═══════════════════════════════════════════════════════════════ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 12mm 12mm 12mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force hide all screen-only UI components */
+  header,
+  footer,
+  nav,
+  aside,
+  button,
+  .print-hidden,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Ensure print letterhead container renders with full clarity */
+  .print-only-letterhead,
+  .print\:block {
+    display: block !important;
+  }
+
+  /* Reset main wrapper for full-page A4 print */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Remove shadows and dark backgrounds on print */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}

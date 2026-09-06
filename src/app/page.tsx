@@ -28,9 +28,9 @@ export default function DoctorConsultScreen() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* Top Header / App Bar */}
-      <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6 py-4">
+    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans print:bg-white print:text-slate-900 print:min-h-0">
+      {/* Top Header / App Bar (Hidden on Print) */}
+      <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6 py-4 print:hidden">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           {/* Brand Logo & Name */}
           <div className="flex items-center gap-3">
@@ -43,7 +43,7 @@ export default function DoctorConsultScreen() {
                   ShifaScribe
                 </h1>
                 <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-                  v0.4-Day14
+                  v0.4-Day21
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -73,9 +73,9 @@ export default function DoctorConsultScreen() {
       </header>
 
       {/* Main Doctor Workspace Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-6">
-        {/* Patient Quick Context Card */}
-        <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 lg:p-8 flex flex-col gap-6 print:p-0 print:m-0 print:max-w-none">
+        {/* Patient Quick Context Card (Hidden on Print) */}
+        <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg print:hidden">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400 font-bold text-lg font-mono">
               #104
@@ -109,16 +109,16 @@ export default function DoctorConsultScreen() {
           </div>
         </section>
 
-        {/* Center Panel: Recorder Component with integrated Transcription UI */}
-        <section className="my-2 flex flex-col items-center justify-center">
+        {/* Center Panel: Recorder Component with integrated Transcription UI (Hidden on Print) */}
+        <section className="my-2 flex flex-col items-center justify-center print:hidden">
           <ConsultationRecorder
             onStateChange={setCurrentRecordingState}
             onTranscriptionUpdate={handleTranscriptionUpdate}
           />
         </section>
 
-        {/* Day 14 Interactive Auto-Filling Prescription Form Component */}
-        <section className="mt-2">
+        {/* Prescription Form Component (Contains interactive UI and A4 Print View) */}
+        <section className="mt-2 print:m-0 print:p-0">
           <PrescriptionForm
             structuredData={structuredEhr}
             rawTranscript={transcriptionText}
@@ -126,8 +126,8 @@ export default function DoctorConsultScreen() {
           />
         </section>
 
-        {/* Live Audio Transcript Preview & Debug Card */}
-        <section className="grid grid-cols-1 gap-6">
+        {/* Live Audio Transcript Preview & Debug Card (Hidden on Print) */}
+        <section className="grid grid-cols-1 gap-6 print:hidden">
           <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-lg">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
@@ -196,9 +196,9 @@ export default function DoctorConsultScreen() {
         </section>
       </main>
 
-      {/* Doctor Consult Screen Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-900/40 py-3 px-6 text-center text-xs text-slate-500">
-        ShifaScribe OPD Scribe System • Day 14: Interactive Auto-Filling Prescription Form UI • Sprint 3
+      {/* Doctor Consult Screen Footer (Hidden on Print) */}
+      <footer className="border-t border-slate-800/80 bg-slate-900/40 py-3 px-6 text-center text-xs text-slate-500 print:hidden">
+        ShifaScribe OPD Scribe System • Day 21: Multi-Drug Voice Scribe &amp; A4 Print Stylesheets • Sprint 4
       </footer>
     </div>
   );
