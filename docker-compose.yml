@@ -1,0 +1,78 @@
+services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # PostgreSQL Database Service
+  # ─────────────────────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: shifascribe-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: shifascribe_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shifascribe_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shifascribe-network
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # FastAPI Backend Service (Whisper AI, DRAP NLP & Audio Pipeline)
+  # ─────────────────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: shifascribe-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/shifascribe_db
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=utf-8
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - backend_storage:/app/storage/audio
+    networks:
+      - shifascribe-network
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Next.js React Frontend Service (Doctor Consult Screen & Admin Dashboard)
+  # ─────────────────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shifascribe-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - shifascribe-network
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Persistent Volumes & Network Definitions
+# ─────────────────────────────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+  backend_storage:
+    driver: local
+
+networks:
+  shifascribe-network:
+    driver: bridge
