@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import ConsultationRecorder, {
   RecordingState,
   TranscriptionStatus,
@@ -52,21 +53,27 @@ export default function DoctorConsultScreen() {
             </div>
           </div>
 
-          {/* OPD Clinic & Doctor Badges */}
-          <div className="hidden md:flex items-center gap-4">
-            <div className="px-3.5 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
-              <span className="text-slate-400 block text-[10px]">Clinic Location</span>
-              <span className="font-semibold text-slate-200">OPD Block B • Room #4</span>
-            </div>
-            <div className="px-3.5 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
-              <span className="text-slate-400 block text-[10px]">Consultant Doctor</span>
-              <span className="font-semibold text-slate-200">
-                Dr. Arsam Khan (General Physician)
-              </span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-800/40 text-xs text-emerald-400 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Urdu Speech &amp; NLP AI Engine Online
+          {/* OPD Clinic & Doctor Badges + Dashboard Link */}
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard"
+              className="px-3.5 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-800/50 text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm hover:border-cyan-500/60 cursor-pointer"
+            >
+              <span>📊</span>
+              <span>Admin Surveillance Dashboard</span>
+            </Link>
+
+            <div className="hidden lg:flex items-center gap-3">
+              <div className="px-3.5 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
+                <span className="text-slate-400 block text-[10px]">Consultant Doctor</span>
+                <span className="font-semibold text-slate-200">
+                  Dr. Arsam Khan (General Physician)
+                </span>
+              </div>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-800/40 text-xs text-emerald-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                Speech &amp; NLP Online
+              </div>
             </div>
           </div>
         </div>
