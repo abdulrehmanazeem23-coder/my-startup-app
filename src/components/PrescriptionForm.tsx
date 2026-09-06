@@ -54,15 +54,23 @@ export default function PrescriptionForm({
   // UI State
   const [copied, setCopied] = useState<boolean>(false);
   const [savedStatus, setSavedStatus] = useState<boolean>(false);
-  const [printDate, setPrintDate] = useState<string>("");
+  const [printDate, setPrintDate] = useState<string>("September 6, 2026");
+  const [securityToken, setSecurityToken] = useState<string>("849201");
 
-  // Populate Print Date
+  // Populate Print Date & Security Token on Client Mount
   useEffect(() => {
-    setPrintDate(new Date().toLocaleDateString("en-PK", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    }));
+    try {
+      setPrintDate(
+        new Date().toLocaleDateString("en-PK", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+      );
+      setSecurityToken(Date.now().toString().slice(-6));
+    } catch {
+      // fallback
+    }
   }, []);
 
   // Auto-Fill Form when structuredData is received from AI Backend
@@ -522,7 +530,7 @@ ${clinicalNotes || "Standard OPD Follow-up & Care."}
           </div>
           <div>
             <span className="text-slate-500 block text-[10px] font-semibold uppercase">Date &amp; Time</span>
-            <span className="font-semibold text-slate-800">{printDate}</span>
+            <span suppressHydrationWarning className="font-semibold text-slate-800">{printDate}</span>
           </div>
         </div>
 
@@ -611,7 +619,7 @@ ${clinicalNotes || "Standard OPD Follow-up & Care."}
         <div className="pt-6 border-t border-slate-300 grid grid-cols-2 gap-4 items-end">
           <div>
             <div className="text-[10px] text-slate-500 font-mono">
-              <p>Security Token: SHIFA-EHR-104-{Date.now().toString().slice(-6)}</p>
+              <p suppressHydrationWarning>Security Token: SHIFA-EHR-104-{securityToken}</p>
               <p>System Verified: ShifaScribe AI Clinical Scribe</p>
             </div>
           </div>
