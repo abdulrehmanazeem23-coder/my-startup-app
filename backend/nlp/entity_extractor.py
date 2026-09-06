@@ -21,8 +21,8 @@ SYMPTOM_LOOKUP = [
     (r"\b(headache|severe\s+headache|sir\s*(?:mai|mein)?\s*dard|head\s+pain|sir\s+dard|سویئر\s*ہیڈک|ہیڈک|ہیڈیک|سر\s*میں\s*درد|سردرد|سر\s+درد|حیڈے|ایڈیکور)\b", "Headache"),
     # Chest pain
     (r"\b(chest\s+pain|sine\s*(?:mai|mein)?\s*dard|seene\s*(?:mai|mein)?\s*dard|سینے\s*میں\s*درد)\b", "Chest Pain"),
-    # Chest tightness
-    (r"\b(chest\s+tightness|sine\s*(?:mai|mein)?\s*jakdan|seene\s*(?:mai|mein)?\s*jakdan|سینے\s*میں\s*جکڑن)\b", "Chest Tightness"),
+    # Chest tightness / Heartburn
+    (r"\b(chest\s+tightness|sine\s*(?:mai|mein)?\s*jakdan|seene\s*(?:mai|mein)?\s*jakdan|heartburn|jalon|سینے\s*میں\s*جکڑن|سینے\s*میں\s*جلن)\b", "Chest Tightness"),
     # Abdominal / Stomach pain
     (r"\b(stomach\s+pain|stomach\s+ache|abdominal\s+pain|pait\s*(?:mai|mein)?\s*dard|pait\s+dard|پیٹ\s*میں\s*درد|پیٹ\s+درد)\b", "Abdominal Pain"),
     # Body ache / Body pain
@@ -56,15 +56,20 @@ SYMPTOM_LOOKUP = [
 # Common Drug Names & Dosage Form Definitions
 # ---------------------------------------------------------------------------
 
-KNOWN_DRUGS = [
+KNOWN_DRUGS = list(set([d.lower() for d in DRAP_CATALOG] + [
     "panadol", "paracetamol", "augmentin", "brufen", "ibuprofen", "flagyl",
     "metronidazole", "disprin", "aspirin", "rigix", "softin", "arinac",
     "ponstan", "surbex", "omeprazole", "risek", "gravinate", "entamizole",
     "zantac", "cefspan", "klaricid", "azomax", "basogabin", "flygyl",
     "amoxicillin", "cipro", "ciprofloxacin", "secnidazole", "gaviscon",
     "calpol", "arinate", "famotidine", "loratadine", "cetirizine", "tramal",
-    "motilium", "domperidone", "buscopan", "leflox", "levofloxacin"
-]
+    "motilium", "domperidone", "buscopan", "leflox", "levofloxacin", "voltral",
+    "diclofenac", "caflam", "synflex", "naproxen", "nexum", "losec", "mucaine",
+    "somogel", "nuberol", "muscoril", "celebrex", "gabica", "lyrica", "concor",
+    "norvasc", "glucophage", "amaryl", "thyroxine", "sunny d", "neurobion",
+    "deltacortril", "betnesol", "polyfax", "dermovate", "montiget", "hydryllin",
+    "ventolin", "seretide", "telfast", "cefixime", "amoxil", "rocephin"
+]))
 
 FORM_PREFIX_MAP = {
     "tab": "Tab.",
@@ -79,12 +84,14 @@ FORM_PREFIX_MAP = {
     "injection": "Inj.",
     "ointment": "Ointment",
     "drops": "Drops",
+    "sachet": "Sachet",
+    "inhaler": "Inhaler",
 }
 
 FORM_WORDS = {
     "tab", "tablet", "tablets", "cap", "capsule", "capsules",
     "syrup", "syp", "inj", "injection", "ointment", "drops",
-    "goli", "goliya", "goliyaan", "sharbath", "dawa", "dawaii"
+    "sachet", "inhaler", "goli", "goliya", "goliyaan", "sharbath", "dawa", "dawaii"
 }
 
 EXCLUDED_WORDS = {
@@ -155,12 +162,12 @@ def extract_medications_detailed(clean_text: str) -> Tuple[List[str], List[Dict[
 
     drug_spans = []
 
-    # Pattern 1: [Optional Leading Form] + Drug Name + [Optional Trailing Form] + Strength
-    # e.g. "Tab. Panadol 500mg", "Panadol tablet 500mg", "Augmentin 625mg", "Cap Risek 40mg"
-    p1 = r"\b(?:(tab|tablet|tablets|cap|capsule|capsules|syrup|syp|inj|injection|ointment|drops)\.?\s+)?([a-zA-Z]{3,20})(?:\s+(tab|tablet|tablets|cap|capsule|capsules|syrup|syp|inj|injection|ointment|drops))?\s+(\d+\s*(?:mg|g|ml|mcg))\b"
+    # Pattern 1: [Optional Form] + Drug Name + [Optional Form/Connector] + Strength
+    # e.g. "Tab. Panadol 500mg", "Panadol tablet 500mg", "Paracetamol aur 200mg", "Augmentin 625mg", "Cap Risek 40mg"
+    p1 = r"\b(?:(tab|tablet|tablets|cap|capsule|capsules|syrup|syp|inj|injection|ointment|drops|sachet|inhaler)\.?\s+)?([a-zA-Z]{3,25})(?:\s+(?:tab|tablet|tablets|cap|capsule|capsules|syrup|syp|inj|injection|ointment|drops|sachet|inhaler|ki|ka|aur|or|and|کی|کا|اور))?\s+(\d+\s*(?:mg|g|ml|mcg|iu|drops?|mgr))\b"
     for m in re.finditer(p1, clean_text, re.IGNORECASE):
-        lead_form, name, trail_form, strength = m.group(1), m.group(2), m.group(3), m.group(4)
-        form = lead_form or trail_form
+        lead_form, name, raw_strength = m.group(1), m.group(2), m.group(3)
+        strength = raw_strength.replace("mgr", "mg").replace(" ", "")
         name_lower = name.lower()
 
         # Ensure name is not a form word or common stopword
@@ -171,7 +178,7 @@ def extract_medications_detailed(clean_text: str) -> Tuple[List[str], List[Dict[
             drug_spans.append({
                 "start": m.start(),
                 "end": m.end(),
-                "form": form,
+                "form": lead_form,
                 "name": name,
                 "strength": strength,
                 "match": m.group(0),
@@ -184,12 +191,12 @@ def extract_medications_detailed(clean_text: str) -> Tuple[List[str], List[Dict[
             if not any(s["start"] <= m.start() <= s["end"] for s in drug_spans):
                 # Search 40 characters ahead for a dosage strength
                 nearby = clean_text[m.end():m.end() + 40]
-                sm = re.search(r"\b(\d+\s*(?:mg|g|ml|mcg))\b", nearby, re.IGNORECASE)
-                strength = sm.group(1) if sm else "500mg"
+                sm = re.search(r"\b(\d+\s*(?:mg|g|ml|mcg|iu|drops?|mgr))\b", nearby, re.IGNORECASE)
+                strength = sm.group(1).replace("mgr", "mg").replace(" ", "") if sm else "500mg"
                 
                 # Check for form word immediately before or after
                 prefix = clean_text[max(0, m.start() - 15):m.start()]
-                pm = re.search(r"\b(tab|tablet|cap|capsule|syrup|inj)\b", prefix, re.IGNORECASE)
+                pm = re.search(r"\b(tab|tablet|cap|capsule|syrup|inj|sachet)\b", prefix, re.IGNORECASE)
                 form = pm.group(1) if pm else None
 
                 drug_spans.append({
@@ -213,7 +220,7 @@ def extract_medications_detailed(clean_text: str) -> Tuple[List[str], List[Dict[
             unique_spans.append(d)
 
     # Locate boundary where follow-up advice / recheckup begins
-    advice_pattern = r"(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ|دوارہ|چکپ)"
+    advice_pattern = r"(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ|دوارہ|چکپ|اچھا\s*کب|چک\s*کب)"
     advice_match = re.search(advice_pattern, clean_text, re.IGNORECASE)
     advice_start = advice_match.start() if advice_match else len(clean_text)
 
@@ -231,7 +238,7 @@ def extract_medications_detailed(clean_text: str) -> Tuple[List[str], List[Dict[
         form_clean = FORM_PREFIX_MAP.get((d["form"] or "").lower(), "Tab.")
         if "ml" in d["strength"].lower() and not d["form"]:
             form_clean = "Syrup"
-        elif "cap" in (d["form"] or "").lower() or d["name"].lower() in ["risek", "omeprazole"]:
+        elif "cap" in (d["form"] or "").lower() or d["name"].lower() in ["risek", "omeprazole", "losec", "nexum", "gabica", "lyrica"]:
             form_clean = "Cap."
 
         # Pass through DRAP fuzzy validator
@@ -282,21 +289,21 @@ def extract_medications(text: str) -> List[str]:
 def extract_clinical_notes(text: str) -> str:
     """
     Extracts doctor clinical advice, precautions, and follow-up recheckup instructions
-    from clinical audio dictation (e.g. 'Patient should come for a recheckup after 7 days' -> 'Follow-up recheckup advised after 7 days.').
+    from clinical audio dictation.
     """
     if not text or not isinstance(text, str):
         return "Standard OPD Follow-up & Care."
 
     t = text.lower()
 
-    # Pattern 1: [recheckup/dobara/visit/checkup] ... [after/in] [number/word] [days/weeks/din]
+    # Pattern 1: [recheckup/dobara/visit/checkup/اچھا کب] ... [after/in] [number/word] [days/weeks/din]
     m1 = re.search(
-        r"(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ|دوارہ|چکپ|آنا\s*ہے)\s*(?:[^\w\s]+\s*|\w+\s+){0,6}(?:after|in|baad|کے\s*بعد|ک\s*بعد)?\s*(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen|ایک|دو|تین|چار|پانچ|سات|دس)\s*(din|days?|hafte|weeks?|mahina|months?|دین|دن)",
+        r"(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ|دوارہ|چکپ|آنا\s*ہے|اچھا\s*کب|چک\s*کب)\s*(?:[^\w\s]+\s*|\w+\s+){0,6}(?:after|in|baad|کے\s*بعد|ک\s*بعد)?\s*(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen|ایک|دو|تین|چار|پانچ|سات|دس)\s*(din|days?|hafte|weeks?|mahina|months?|دین|دن)",
         t
     )
     # Pattern 2: [number/word] [days/din] [after / ke baad] ... [recheckup/dobara/visit/checkup]
     m2 = re.search(
-        r"(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen|ایک|دو|تین|چار|پانچ|سات|دس)\s*(din|days?|hafte|weeks?|mahina|months?|دین|دن)\s*(?:ke\s+baad|kay\s+baad|baad|after|کے\s*بعد|ک\s*بعد)?\s*(?:[^\w\s]+\s*|\w+\s+){0,6}(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ|دوارہ|چکپ|آنا\s*ہے)",
+        r"(\d+|ek|one|do|two|teen|three|char|chahr|four|paanch|panch|five|chhe|che|six|saat|seven|aath|eight|nau|nine|das|ten|pandrah|fifteen|ایک|دو|تین|چار|پانچ|سات|دس)\s*(din|days?|hafte|weeks?|mahina|months?|دین|دن)\s*(?:ke\s+baad|kay\s+baad|baad|after|کے\s*بعد|ک\s*بعد)?\s*(?:[^\w\s]+\s*|\w+\s+){0,6}(?:dobara|recheckup|re-checkup|checkup|visit|چیکپ|وزٹ|چیکٹ|دوارہ|چکپ|آنا\s*ہے|اچھا\s*کب|چک\s*کب)",
         t
     )
 
@@ -307,7 +314,7 @@ def extract_clinical_notes(text: str) -> str:
         unit_clean = "days" if any(u in raw_unit for u in ["din", "day", "دین", "دن"]) else ("weeks" if any(u in raw_unit for u in ["haft", "week", "ہفت"]) else "months")
         return f"Follow-up recheckup advised after {num_clean} {unit_clean}."
 
-    if any(k in t for k in ["dobara", "recheckup", "re-checkup", "checkup", "visit", "چیکپ", "وزٹ", "چیکٹ", "دوارہ", "چکپ"]):
+    if any(k in t for k in ["dobara", "recheckup", "re-checkup", "checkup", "visit", "چیکپ", "وزٹ", "چیکٹ", "دوارہ", "چکپ", "اچھا کب", "چک کب"]):
         return "Follow-up OPD recheckup advised."
 
     return "Standard OPD Follow-up & Care."

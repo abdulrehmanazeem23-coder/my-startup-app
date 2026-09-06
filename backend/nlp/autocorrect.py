@@ -7,16 +7,7 @@ and drug name misspellings into clean English medical terms for downstream NLP e
 import re
 from typing import List
 from thefuzz import process, fuzz
-
-# Common Pakistani pharmaceuticals catalog for fuzzy auto-correction
-DRAP_CATALOG = [
-    "Panadol", "Paracetamol", "Augmentin", "Brufen", "Ibuprofen", "Flagyl",
-    "Metronidazole", "Disprin", "Aspirin", "Rigix", "Softin", "Arinac",
-    "Ponstan", "Surbex", "Omeprazole", "Risek", "Gravinate", "Entamizole",
-    "Zantac", "Cefspan", "Klaricid", "Azomax", "Basogabin", "Cipro", "Ciprofloxacin",
-    "Secnidazole", "Gaviscon", "Calpol", "Arinate", "Famotidine", "Loratadine", "Cetirizine",
-    "Motilium", "Domperidone", "Buscopan", "Leflox", "Levofloxacin", "Tramal"
-]
+from .drap_validator import DRAP_CATALOG
 
 # ═══════════════════════════════════════════════════════════════════════════
 # PHASE 0: Pre-processing rules (run BEFORE main autocorrect)
@@ -25,13 +16,15 @@ DRAP_CATALOG = [
 PRE_PROCESS_RULES = [
     # Strip trailing Urdu characters attached to English drug names
     # e.g. "Augmentinڈ" → "Augmentin", "Panadolک" → "Panadol"
-    (r"\b(" + "|".join(DRAP_CATALOG) + r")[^\s\w]*[\u0600-\u06FF]+", r"\1"),
+    (r"\b(" + "|".join(re.escape(d) for d in DRAP_CATALOG) + r")[^\s\w]*[\u0600-\u06FF]+", r"\1"),
+    # Normalize 'mgr' typo from speech-to-text (e.g. '200mgr' -> '200mg', '500mgr' -> '500mg')
+    (r"(\d+)\s*mgr\b", r"\1mg"),
     # Separate joined Urdu number-word combos: "چاردنڑ" → "چار دن"
-    (r"(چار|تین|دو|پانچ|سات|ایک|دس)(دن[ڑ]?)", r"\1 دن"),
+    (r"(چار|تین|دو|پانچ|سات|ایک|دس|پندرہ|بیس|تیس)(دن[ڑ]?)", r"\1 دن"),
     # "دورو ٹائم" → "دو ٹائم" (Whisper adds ر to دو)
-    (r"دورو\s*(?=ٹائم|طائم|طایم|طاہم|ٹایم)", "دو "),
+    (r"دورو\s*(?=ٹائم|طائم|طایم|طاہم|ٹایم|ٹی\s*ٹام|ٹی\s*تام)", "دو "),
     # Normalize spaced units: 500 mg -> 500mg, 200 mg -> 200mg
-    (r"(\d+)\s+(mg|g|ml|mcg)\b", r"\1\2"),
+    (r"(\d+)\s+(mg|g|ml|mcg|iu)\b", r"\1\2"),
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -42,24 +35,22 @@ CLINICAL_AUTOCORRECT_RULES = [
     # ── 1. Drug Name Phonetics (Urdu Script + English misspellings) ─────
 
     # Panadol: ALL known Whisper phonetic outputs
-    # پلڈٹال, پنڈال, پنڈر, پینڈال, پینڈول, etc.
     (r"(?:پلڈٹال|پنڈال|پنڈر|پینڈال|پینڈول|پیناڈول|پینا\s*ڈول|پینادول|پینڈڈال|پنادول|پنڈول|پندال|پناڈول|پنڈٹال|پلنڈال|پینڈل|پلڈال|پنادل|پنڈل)", "Panadol"),
     (r"\b(penadol|punadol|panadoll|painadol|panadul|pandol|penodol|panadl|pnadol)\b", "Panadol"),
 
-    # Paracetamol
-    (r"(?:پیراسیٹامول|پراسیٹامول|پراسیٹمول|پیرسیٹامول)", "Paracetamol"),
-    (r"\b(paracetmol|paracetamal|parasitamol|paracetamole)\b", "Paracetamol"),
+    # Paracetamol: ALL Whisper variants including پیرسیٹم, پراسیٹم, پیرسیٹامل
+    (r"(?:پیراسیٹامول|پراسیٹامول|پراسیٹمول|پیرسیٹامول|پیرسیٹم|پراسیٹم|پیرسیٹامل|پراسیٹامل|پیرسٹامول|پیرسٹامل|پیرسیٹیم)", "Paracetamol"),
+    (r"\b(paracetmol|paracetamal|parasitamol|paracetamole|paracetam|parasitam|paracitamol)\b", "Paracetamol"),
 
     # Calpol
     (r"(?:کالپول|کیلپول)\b", "Calpol"),
     (r"\b(calpole|kalpol|calpal)\b", "Calpol"),
 
-    # Augmentin: ALL known Whisper phonetic outputs
-    # اگمانٹن, مائنٹن, اوڈ مائنٹن, etc.
-    (r"(?:اوڈ\s*)?(?:مائنٹن|مائنٹین|اگمانٹن|اوگمینٹن|اوگمنٹن|اوگمنٹین|اگمنٹن|اگمنٹین|اگمینٹن|اگمینٹین|آگمنٹن|آگمینٹن|اگمنٹون|اوگمنٹون|اسکا\s*بم|اسکھابم|اسکابم|اوگمانٹن|آگمانٹن|مینٹن)", "Augmentin"),
-    (r"\b(augmenten|augmentun|aggmentin|ogmentin|augmantin|agmentin|augmanti|agmantin|ogmantin)\b", "Augmentin"),
+    # Augmentin: ALL known Whisper phonetic outputs including اوپ مینٹل, اوپمینٹل, مائنٹن, اگمانٹن
+    (r"(?:اوپ\s*مینٹل|اوپمینٹل|اوپ\s*مائنٹل|اوپمائنٹل|اوپ\s*مینٹن|اوپمینٹن|اوپ\s*منٹن|اوپمنٹن|اوپ\s*منٹل|اوپمنٹل|اوڈ\s*)?(?:مائنٹن|مائنٹین|اگمانٹن|اوگمینٹن|اوگمنٹن|اوگمنٹین|اگمنٹن|اگمنٹین|اگمینٹن|اگمینٹین|آگمنٹن|آگمینٹن|اگمنٹون|اوگمنٹون|اسکا\s*بم|اسکھابم|اسکابم|اوگمانٹن|آگمانٹن|مینٹن|مینٹل|اوگمینٹل|اوگمنٹل)", "Augmentin"),
+    (r"\b(augmenten|augmentun|aggmentin|ogmentin|augmantin|agmentin|augmanti|agmantin|ogmantin|opmentin|opmintil|opmentil|augmentil)\b", "Augmentin"),
 
-    # Brufen
+    # Brufen / Ibuprofen
     (r"(?:بروفن|بروفین|ابروفن|بروفان)", "Brufen"),
     (r"\b(brofen|bruffen|bruphen|broofen|brufin)\b", "Brufen"),
 
@@ -67,60 +58,112 @@ CLINICAL_AUTOCORRECT_RULES = [
     (r"(?:پونسٹان|پونسٹین|پونستان|پانسٹان)", "Ponstan"),
     (r"\b(ponsten|ponstaan|ponston)\b", "Ponstan"),
 
-    # Disprin
+    # Disprin / Aspirin
     (r"(?:ڈسپرین|ڈیسپرین|دسپرین)", "Disprin"),
     (r"\b(dispren|desprin|dispreen|disprin)\b", "Disprin"),
+    (r"(?:ایسپرین|اسپرین)\b", "Aspirin"),
 
-    # Flagyl
+    # Flagyl / Metronidazole
     (r"(?:فلیجل|فلائیجل|فلاجل|فلیجیل)", "Flagyl"),
     (r"\b(flygyl|flgyl|flagil|flajil|flegel)\b", "Flagyl"),
-
-    # Cefspan / Cefixime
-    (r"(?:سین|سینو|سائن|سیفیکزیم|سیفپین|سیفسیپان|سیفسپان|سیفسپن)", "Cefspan"),
-    (r"\b(cefspan|cefixime|cefspan)\b", "Cefspan"),
-
-    # Risek / Omeprazole
-    (r"(?:رائزک|رائزیک|ریزک|رسیک)", "Risek"),
-    (r"\b(rizek|raizek|raisek|riseck)\b", "Risek"),
-    (r"(?:اومیپرازول|امیپرازول)", "Omeprazole"),
-
-    # Arinac / Surbex / Gravinate
-    (r"(?:آرینیک|ارینیک|آرینک|ارینک)", "Arinac"),
-    (r"\b(arinak|arnac)\b", "Arinac"),
-    (r"(?:سوربیکس|سربیکس)", "Surbex"),
-    (r"(?:گریوینیٹ|گروینیٹ)", "Gravinate"),
-
-    # Rigix / Softin
-    (r"(?:رجکس|ریجکس|رگکس|سیٹریزین|سٹریزین)\b", "Rigix"),
-    (r"\b(rigx|regix|cetrizine|setrizine)\b", "Rigix"),
-    (r"(?:سوفٹن|سافٹن|لوراٹاڈین)\b", "Softin"),
-    (r"\b(soften|loratadine)\b", "Softin"),
-
-    # Gaviscon
-    (r"(?:گیوسکان|گیویسکان|گاویسکان)\b", "Gaviscon"),
-    (r"\b(gaviscon|gavison)\b", "Gaviscon"),
-
-    # Klaricid / Azomax
-    (r"(?:کلاریسیڈ|کلاریسڈ|کلیریکیڈ)\b", "Klaricid"),
-    (r"\b(claricid|klaracid|claracid)\b", "Klaricid"),
-    (r"(?:ایزوماکس|ازوماکس|ایزومیکس)\b", "Azomax"),
-    (r"\b(azomax|azimax|azomx)\b", "Azomax"),
+    (r"(?:میٹرونیڈازول|میٹرونیدازول)\b", "Metronidazole"),
 
     # Entamizole
     (r"(?:انٹامیزول|اینٹامیزول|انٹامزول)\b", "Entamizole"),
 
+    # Cefspan / Cefixime
+    (r"(?:سین|سینو|سائن|سیفیکزیم|سیفپین|سیفسیپان|سیفسپان|سیفسپن)", "Cefspan"),
+    (r"\b(cefspan|cefixime)\b", "Cefspan"),
+
+    # Risek / Omeprazole / Losec / Nexum / Esomeprazole
+    (r"(?:رائزک|رائزیک|ریزک|رسیک)", "Risek"),
+    (r"\b(rizek|raizek|raisek|riseck)\b", "Risek"),
+    (r"(?:اومیپرازول|امیپرازول)", "Omeprazole"),
+    (r"(?:نیکسم|نیکسم|ایسومپرازول|ایزوم)", "Nexum"),
+    (r"(?:لوزیک|لوزک)", "Losec"),
+
+    # Arinac / Surbex / Gravinate / Motilium / Buscopan
+    (r"(?:آرینیک|ارینیک|آرینک|ارینک)", "Arinac"),
+    (r"\b(arinak|arnac)\b", "Arinac"),
+    (r"(?:سوربیکس|سربیکس|سوربیکس\s*زیڈ)", "Surbex-Z"),
+    (r"(?:گریوینیٹ|گروینیٹ|گریونیٹ)", "Gravinate"),
+    (r"(?:موٹیلیم|موٹیلم|ڈومپیریڈون)", "Motilium"),
+    (r"(?:بسکوپان|بسکوپین|ہائیوسین)", "Buscopan"),
+    (r"(?:کلوفیک|کولو\s*فیک|ڈسپاتالین|ڈسپتالین)", "Colofac"),
+
+    # Rigix / Softin / T-Day / Telfast / Kestine
+    (r"(?:رجکس|ریجکس|رگکس|سیٹریزین|سٹریزین)\b", "Rigix"),
+    (r"\b(rigx|regix|cetrizine|setrizine)\b", "Rigix"),
+    (r"(?:سوفٹن|سافٹن|لوراٹاڈین)\b", "Softin"),
+    (r"\b(soften|loratadine)\b", "Softin"),
+    (r"(?:ٹیلفاسٹ|ٹیل\s*فاسٹ|فیکسو\s*فیناڈین|ٹی\s*ڈے|ٹیڈے)", "Telfast"),
+    (r"(?:کیسٹین|کیسٹن)", "Kestine"),
+    (r"(?:ایول|ایویل)\b", "Avil"),
+
+    # Gaviscon / Mucaine / Somogel
+    (r"(?:گیوسکان|گیویسکان|گاویسکان)\b", "Gaviscon"),
+    (r"\b(gaviscon|gavison)\b", "Gaviscon"),
+    (r"(?:میوکین|میوکائن)", "Mucaine"),
+    (r"(?:سوموجیل|سوموجل)", "Somogel"),
+
+    # Klaricid / Azomax / Zithromax / Cipro / Leflox / Moxiget / Velosef / Septran
+    (r"(?:کلاریسیڈ|کلاریسڈ|کلیریکیڈ)\b", "Klaricid"),
+    (r"\b(claricid|klaracid|claracid)\b", "Klaricid"),
+    (r"(?:ایزوماکس|ازوماکس|ایزومیکس|زتھروماکس|زتھرومیکس)\b", "Azomax"),
+    (r"\b(azomax|azimax|azomx|zithromax)\b", "Azomax"),
+    (r"(?:سپرو|سفرو|سپروفلوکساسین|سپروکسن)", "Cipro"),
+    (r"\b(cipro|ciproxin)\b", "Cipro"),
+    (r"(?:لی\s*فلوکس|لیفلوکس|لیوفلوکساسین)", "Leflox"),
+    (r"(?:موکسی\s*گیٹ|موکسیگیٹ|موکسیفلوکساسین)", "Moxiget"),
+    (r"(?:ویلوسیف|ویلوسف|سیفراڈین)", "Velosef"),
+    (r"(?:سیپٹران|سپٹران)", "Septran"),
+    (r"(?:اموکسل|اموکسل|اموکسیسلین)", "Amoxil"),
+
+    # Voltral / Diclofenac / Caflam / Synflex / Nuberol / Muscoril / Celebrex / Tramal
+    (r"(?:وولٹرال|ولٹرال|والٹرال|ڈائیکلوفینک|ڈیکلوفینک)", "Voltral"),
+    (r"(?:کیفلام|کافلام|کفلام)", "Caflam"),
+    (r"(?:سنفلیکس|سنفلکس|نیپروکسن)", "Synflex"),
+    (r"(?:نیوبرول|نوبرول)\s*(?:فورٹ)?", "Nuberol Forte"),
+    (r"(?:مسکوریل|مسکورل)", "Muscoril"),
+    (r"(?:سیلیبریکس|سیلیبرکس)", "Celebrex"),
+    (r"(?:ٹرامال|ٹرامادول)", "Tramal"),
+    (r"(?:گیبیکا|گابیکا|پریگابالین)", "Gabica"),
+    (r"(?:لیریکا|لاریکا)", "Lyrica"),
+
+    # Cardiovascular / Antihypertensive
+    (r"(?:کونکور|کانکور|بائسوپرولول)", "Concor"),
+    (r"(?:ٹینورمین|ٹینورمن|اٹینولول)", "Tenormin"),
+    (r"(?:نورواسک|نورواسک|ایملوڈیپین)", "Norvasc"),
+    (r"(?:کیپوٹن|کیپوٹین|کیپٹوپرل)", "Capoten"),
+    (r"(?:کوزار|ایزی\s*ڈے|ایزیڈے|لوسارٹن)", "Eziday"),
+    (r"(?:گلوکوفیج|گلوکوفاج|میٹفارمین)", "Glucophage"),
+    (r"(?:ڈائیمائیکرون|ڈائیمائکرون|گلیکلازائڈ)", "Diamicron"),
+    (r"(?:ایماریل|اماریل|گلیمیپرائڈ)", "Amaryl"),
+    (r"(?:تھائیروکسین|تھائروکسین)", "Thyroxine"),
+
+    # Vitamins / Supplements / Respiratory / Drops
+    (r"(?:سی\s*اے\s*سی|کیک\s*۱۰۰۰|کیک\s*ہزار|کیلسی)", "Cac-1000 Plus"),
+    (r"(?:ایویون|سنی\s*ڈی|انڈراپ\s*ڈی|انڈراپ)", "Sunny D"),
+    (r"(?:نیوروبین|نیوروبیون|میتھیکوبال|میتھائی\s*کوبال)", "Neurobion"),
+    (r"(?:ڈیلٹاکارٹرل|ڈیلٹا\s*کارٹرل|پریڈنیسولون)", "Deltacortril"),
+    (r"(?:ڈیکاڈرون|ڈیکاڈران|بیٹنیسول|بیٹنی\s*سول)", "Betnesol"),
+    (r"(?:فیوسیڈین|فیوسڈن|پولی\s*فیکس|پولیفیکس)", "Polyfax"),
+    (r"(?:ڈرموویٹ|ڈرمویٹ|بیٹنوویٹ|بیٹنویٹ)", "Dermovate"),
+    (r"(?:مونٹیگیٹ|مونٹی\s*گیٹ|مائٹیکا|مونٹیلوکاسٹ)", "Montiget"),
+    (r"(?:ہائیڈرلین|ہائیڈرالین|پلمونول|پروسپان|سانکوس)", "Hydryllin"),
+    (r"(?:وینٹولین|وینٹولن|سالبوٹامول)", "Ventolin"),
+    (r"(?:سیریٹائڈ|سمبیکورٹ)", "Seretide"),
+
     # ── 2. Dosage Units (Urdu Script → English) ─────────────────────────
-    # مج / ملے گرام / ملکران / ملگرام are all common Whisper outputs for "mg"
     (r"(\d+)\s*(?:مج[ی]?|ملج|ملے\s*گرام|ملکران|ملک\s*گرام|ملی\s*گرام|ملگرام|ملیگرام|ملگرامز|ایم\s*جی|ایمجی)\b", r"\1mg"),
     (r"(\d+)\s*(?:گرام|گرامز)\b", r"\1g"),
     (r"(\d+)\s*(?:ملی\s*لیٹر|ایم\s*ایل)\b", r"\1ml"),
 
     # ── 3. Urdu Script Frequencies & Directives ─────────────────────────
-    # NOTE: Negative lookahead (?!ہ|ا) prevents matching inside دوبارہ / دوبارا
-    # طایم / طاہم / طائم / ٹائم / ٹایم are ALL Whisper variants of "time"
-    (r"(?:تیڈیل|ٹی\s*ڈی\s*ایس|ٹیڈیل|تین\s+دفعہ|تین\s*(?:ٹائم|طائم|طایم|طاہم|ٹائمز|طائمز|ٹایم)|۳\s*(?:ٹائم|طائم|طایم|طاہم|ٹایم)|3\s*(?:طیم|طائم|طایم|طاہم|ٹایم)|تین\s*مرتبہ|تین\s+بار)", "TDS"),
-    (r"(?:بی\s*آئی\s*ڈی|بی\s*ڈی|صبح\s+شام|صبح\s*و\s*شام|دو\s*(?:ٹائم|طائم|طایم|طاہم|ٹائمز|طائمز|ٹایم)|۲\s*(?:ٹائم|طائم|طایم|طاہم|ٹایم)|2\s*(?:طیم|طائم|طایم|طاہم|ٹایم)|دو\s*مرتبہ|دو\s+بار(?!ہ|ا))", "BID"),
-    (r"(?:او\s*ڈی|ایک\s+دفعہ|ایک\s*(?:ٹائم|طائم|طایم|طاہم|ٹائمز|ٹایم)|1\s*(?:طیم|طائم|طایم|طاہم|ٹایم)|ایک\s*مرتبہ|ایک\s+بار|روزانہ)", "OD"),
+    # Supports تین ٹی ٹام / تین ٹی تام / ٹی ٹام / تین ٹائم / ٹی ڈی ایس
+    (r"(?:تین\s*ٹی\s*ٹام|تین\s*ٹی\s*تام|ٹی\s*ٹام|ٹی\s*تام|تین\s*ٹام|تیڈیل|ٹی\s*ڈی\s*ایس|ٹیڈیل|تین\s+دفعہ|تین\s*(?:ٹائم|طائم|طایم|طاہم|ٹائمز|طائمز|ٹایم)|۳\s*(?:ٹائم|طائم|طایم|طاہم|ٹایم)|3\s*(?:طیم|طائم|طایم|طاہم|ٹایم)|تین\s*مرتبہ|تین\s+بار)", "TDS"),
+    (r"(?:دو\s*ٹی\s*ٹام|دو\s*ٹی\s*تام|دو\s*ٹام|بی\s*آئی\s*ڈی|بی\s*ڈی|صبح\s+شام|صبح\s*و\s*شام|دو\s*(?:ٹائم|طائم|طایم|طاہم|ٹائمز|طائمز|ٹایم)|۲\s*(?:ٹائم|طائم|طایم|طاہم|ٹایم)|2\s*(?:طیم|طائم|طایم|طاہم|ٹایم)|دو\s*مرتبہ|دو\s+بار(?!ہ|ا))", "BID"),
+    (r"(?:ایک\s*ٹی\s*ٹام|ایک\s*ٹام|او\s*ڈی|ایک\s+دفعہ|ایک\s*(?:ٹائم|طائم|طایم|طاہم|ٹائمز|ٹایم)|1\s*(?:طیم|طائم|طایم|طاہم|ٹایم)|ایک\s*مرتبہ|ایک\s+بار|روزانہ)", "OD"),
     (r"(?:کیو\s*ایچ\s*ایس|راات\s*کو|رات\s*کو)", "QHS"),
 
     # ── 4. Duration & Phonetics ─────────────────────────────────────────
@@ -132,14 +175,15 @@ CLINICAL_AUTOCORRECT_RULES = [
     (r"پانچ\s*(?:دین|دنے|دن)\b", "5 din"),
     (r"سات\s*(?:دین|دنے|دن)\b", "7 din"),
     (r"دس\s*(?:دین|دنے|دن)\b", "10 din"),
-    # "اردن" / "ارڈن" = garbled "4 din" from Whisper
     (r"(?:اردن|ارڈن)\s*کے?\s*لیے", "4 din کے لیے"),
 
-    # ── 5. Symptoms & Complaints (Urdu Script → English) ────────────────
-    # حیڈے / حیڈے کیا / ہیڈک / ایڈیکور are all Whisper variants of "headache"
+    # ── 5. Recheckup & Clinical Follow-Up ──────────────────────────────
+    # دو بارہ سی اچھا کب / اچھا کب / چک کب / چیک کپ / دوبارہ چیکپ
+    (r"(?:دو\s*بارہ\s*سی\s*اچھا\s*کب|اچھا\s*کب|چیک\s*کب|چک\s*کب|اچھا\s*کپ|دوبارہ\s*چیکپ|دوبارہ\s*چکپ|دوبارہ\s*وزٹ|چیک\s*اپ)", "recheckup"),
+
+    # ── 6. Symptoms & Complaints (Urdu Script → English) ────────────────
     (r"(?:حیڈے\s*(?:کیا)?|سویئر\s*ہیڈک|ہیڈک|ہیڈیک|سر\s*میں\s*درد|سردرد|سر\s+درد|ایڈیکور|ایڈیک|ھیڈیک)", "headache"),
     (r"(?:صورت|صور|شدید|سوئر|سویئر|انکس\s*ور)\b", "severe"),
-    # فیبر is a Whisper variant of "fever"
     (r"(?:فیبر|فیور|بخار|تیز\s*بخار)", "fever"),
     (r"(?:فلو|نزلا|نزلہ|زکام|سوئر\s+فلو)", "flu"),
     (r"(?:کھانسی|شدید\s*کھانسی)", "cough"),
@@ -147,7 +191,7 @@ CLINICAL_AUTOCORRECT_RULES = [
     (r"(?:دست|پتلے\s*دست)", "diarrhea"),
     (r"(?:چکر|سر\s*چکر|سر\s*چکرانا)", "dizziness"),
 
-    # ── 6. Word-Number Spacing (after7 → after 7, for5 → for 5) ────────
+    # ── 7. Word-Number Spacing (after7 → after 7, for5 → for 5) ────────
     (r"\b(after|for|in|within|before)(\d+)\b", r"\1 \2"),
 ]
 
@@ -187,7 +231,7 @@ def autocorrect_transcript(text: str) -> str:
         "they", "this", "those", "through", "time", "times", "told", "took", "turn",
         "under", "until", "upon", "very", "want", "well", "went", "were", "what",
         "when", "where", "which", "while", "whom", "will", "with", "work", "would",
-        "year", "your", "above", "should", "could", "their", "severe", "whose",
+        "year", "your", "above", "should", "could", "their", "severe", "whose", "name",
         # Medical/clinical context words
         "patient", "headache", "fever", "cough", "pain", "tablet",
         "capsule", "syrup", "injection", "prescribed", "daily", "weeks", "months",
