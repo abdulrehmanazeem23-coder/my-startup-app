@@ -178,12 +178,14 @@ CLINICAL_AUTOCORRECT_RULES = [
     (r"(?:اردن|ارڈن)\s*کے?\s*لیے", "4 din کے لیے"),
 
     # ── 5. Recheckup & Clinical Follow-Up ──────────────────────────────
-    # دو بارہ سی اچھا کب / اچھا کب / چک کب / چیک کپ / دوبارہ چیکپ
-    (r"(?:دو\s*بارہ\s*سی\s*اچھا\s*کب|اچھا\s*کب|چیک\s*کب|چک\s*کب|اچھا\s*کپ|دوبارہ\s*چیکپ|دوبارہ\s*چکپ|دوبارہ\s*وزٹ|چیک\s*اپ)", "recheckup"),
+    # ستو بارہ / دو بارہ سی اچھا کب / اچھا کب / چک کب / چیک کپ / دوبارہ چیکپ
+    (r"(?:ستو\s*بارہ|ستوبارہ|سو\s*بارہ|دو\s*بارہ\s*سی\s*اچھا\s*کب|اچھا\s*کب|چیک\s*کب|چک\s*کب|اچھا\s*کپ|دوبارہ\s*چیکپ|دوبارہ\s*چکپ|دوبارہ\s*وزٹ|چیک\s*اپ)", "recheckup"),
 
     # ── 6. Symptoms & Complaints (Urdu Script → English) ────────────────
-    (r"(?:حیڈے\s*(?:کیا)?|سویئر\s*ہیڈک|ہیڈک|ہیڈیک|سر\s*میں\s*درد|سردرد|سر\s+درد|ایڈیکور|ایڈیک|ھیڈیک)", "headache"),
+    # حیڈے / حیڈے کیا / حیرے کیا / حیرے / ہیڈک / ایڈیکور are all Whisper variants of "headache"
+    (r"(?:حی[ڈ|ر][ے|ی|ا]?\s*(?:کیا)?|حیرے\s*کیا|حیرے|حیریک|حیریا|سویئر\s*ہیڈک|ہیڈک|ہیڈیک|سر\s*میں\s*درد|سردرد|سر\s+درد|ایڈیکور|ایڈیک|ھیڈیک)", "headache"),
     (r"(?:صورت|صور|شدید|سوئر|سویئر|انکس\s*ور)\b", "severe"),
+    # فیبر is a Whisper variant of "fever"
     (r"(?:فیبر|فیور|بخار|تیز\s*بخار)", "fever"),
     (r"(?:فلو|نزلا|نزلہ|زکام|سوئر\s+فلو)", "flu"),
     (r"(?:کھانسی|شدید\s*کھانسی)", "cough"),
@@ -196,6 +198,20 @@ CLINICAL_AUTOCORRECT_RULES = [
 ]
 
 
+def expand_multiplier_notation(text: str) -> str:
+    """
+    Expands physician multiplier dictation like '2x3 din' -> 'BID 3 din' or '3x5 din' -> 'TDS 5 din'.
+    """
+    def _repl(m):
+        freq_num = m.group(1)
+        dur_num = m.group(2)
+        unit = m.group(3)
+        freq_map = {"1": "OD", "2": "BID", "3": "TDS", "4": "QID"}
+        freq_str = freq_map.get(freq_num, f"{freq_num} times a day")
+        return f"{freq_str} {dur_num} {unit}"
+    return re.sub(r"(\d+)\s*[xX*×]\s*(\d+)\s*(din|days?|دن|دین)\b", _repl, text, flags=re.IGNORECASE)
+
+
 def autocorrect_transcript(text: str) -> str:
     """
     Phonetically auto-corrects a raw transcribed speech string (English, Roman Urdu, or Urdu script).
@@ -206,7 +222,8 @@ def autocorrect_transcript(text: str) -> str:
 
     corrected = text
 
-    # Phase 0: Pre-processing (clean Whisper artifacts)
+    # Phase 0: Pre-processing (clean Whisper artifacts & multiplier notation)
+    corrected = expand_multiplier_notation(corrected)
     for pattern, replacement in PRE_PROCESS_RULES:
         corrected = re.sub(pattern, replacement, corrected, flags=re.IGNORECASE)
 
