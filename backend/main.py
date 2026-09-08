@@ -20,8 +20,14 @@ from ai.audio_processor import sanitize_audio
 from ai.whisper_service import WhisperTranscriber
 from nlp import extract_full_prescription, autocorrect_transcript
 
-# Auto-create & migrate database tables
-Base.metadata.create_all(bind=engine)
+def init_db_safely():
+    """Safely attempts table creation without crashing server if credentials are bad."""
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("[ShifaScribe DB] Database tables verified / created successfully.")
+    except Exception as e:
+        print(f"[ShifaScribe DB Warning] Could not connect to DATABASE_URL: {e}")
+        print("[ShifaScribe DB Warning] Please verify your database credentials in .env file.")
 
 def ensure_db_columns():
     """Safety migration helper to ensure new columns exist in SQLite/PostgreSQL database."""
@@ -69,6 +75,7 @@ def seed_initial_data():
     except Exception as e:
         print(f"[ShifaScribe DB Seeder Info] Seed check: {e}")
 
+init_db_safely()
 ensure_db_columns()
 seed_initial_data()
 
