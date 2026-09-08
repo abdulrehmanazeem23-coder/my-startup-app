@@ -40,7 +40,36 @@ def ensure_db_columns():
     except Exception as err:
         print(f"[ShifaScribe DB Migration Info] Column check: {err}")
 
+def seed_initial_data():
+    """Seeds default OPD demo patient and doctor records if they don't exist."""
+    try:
+        with SessionLocal() as db:
+            doc = db.query(models.Doctor).filter(models.Doctor.id == 4).first()
+            if not doc:
+                doc = models.Doctor(
+                    id=4,
+                    name="Dr. Arsam Khan",
+                    department="General Medicine",
+                    room_number="OPD Room #4"
+                )
+                db.add(doc)
+            pat = db.query(models.Patient).filter(models.Patient.id == 104).first()
+            if not pat:
+                pat = models.Patient(
+                    id=104,
+                    name="Muhammad Tariq",
+                    age=45,
+                    gender="Male",
+                    opd_token="#104"
+                )
+                db.add(pat)
+            db.commit()
+            print("[ShifaScribe DB Seeder] Seeded default OPD Doctor & Patient records!")
+    except Exception as e:
+        print(f"[ShifaScribe DB Seeder Info] Seed check: {e}")
+
 ensure_db_columns()
+seed_initial_data()
 
 app = FastAPI(
     title="ShifaScribe AI Medical Scribe API",
@@ -50,6 +79,7 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def startup_event():
+    seed_initial_data()
     print("[ShifaScribe Startup] Pre-warming Whisper AI model in memory...")
     get_transcriber_instance()
     print("[ShifaScribe Startup] Whisper AI model pre-warmed and ready for instant inference!")
@@ -244,10 +274,52 @@ async def upload_consultation_audio(
         with open(saved_file_path, "wb") as f:
             f.write(contents)
 
+        # Validate and resolve foreign keys safely for PostgreSQL
+        valid_patient_id = None
+        if patient_id is not None:
+            patient_exists = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
+            if patient_exists:
+                valid_patient_id = patient_id
+            else:
+                try:
+                    new_patient = models.Patient(
+                        id=patient_id,
+                        name=f"Patient #{patient_id}",
+                        age=40,
+                        gender="Unknown",
+                        opd_token=f"#{patient_id}"
+                    )
+                    db.add(new_patient)
+                    db.commit()
+                    valid_patient_id = patient_id
+                except Exception:
+                    db.rollback()
+                    valid_patient_id = None
+
+        valid_doctor_id = None
+        if doctor_id is not None:
+            doctor_exists = db.query(models.Doctor).filter(models.Doctor.id == doctor_id).first()
+            if doctor_exists:
+                valid_doctor_id = doctor_id
+            else:
+                try:
+                    new_doctor = models.Doctor(
+                        id=doctor_id,
+                        name=f"Doctor #{doctor_id}",
+                        department="General OPD",
+                        room_number=f"Room #{doctor_id}"
+                    )
+                    db.add(new_doctor)
+                    db.commit()
+                    valid_doctor_id = doctor_id
+                except Exception:
+                    db.rollback()
+                    valid_doctor_id = None
+
         # Save record to database
         consultation_entry = models.ConsultationLog(
-            patient_id=patient_id,
-            doctor_id=doctor_id,
+            patient_id=valid_patient_id,
+            doctor_id=valid_doctor_id,
             audio_file_path=saved_file_path,
             file_size_kb=file_size_kb,
             mime_type=file.content_type or "audio/webm",
