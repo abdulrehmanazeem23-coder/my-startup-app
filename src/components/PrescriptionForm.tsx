@@ -196,7 +196,7 @@ ${clinicalNotes || "Standard OPD Follow-up & Care."}
     setSaveErrorMessage(null);
     setSaveSuccessMessage(null);
 
-    const pid = typeof patientId === "number" ? patientId : parseInt(String(patientId).replace(/[^0-9]/g, ""), 10) || 104;
+    const pid = patientId ? String(patientId) : "104";
     const backendUrl = typeof window !== "undefined"
       ? `http://${window.location.hostname || "localhost"}:8000`
       : "http://localhost:8000";
@@ -204,7 +204,7 @@ ${clinicalNotes || "Standard OPD Follow-up & Care."}
     try {
       const payload = {
         consultation_id: consultationId || undefined,
-        doctor_id: 4,
+        doctor_id: "4",
         symptoms: symptoms,
         medications: medications,
         medications_detailed: structuredData?.medications_detailed || [],
@@ -214,7 +214,7 @@ ${clinicalNotes || "Standard OPD Follow-up & Care."}
         transcription_text: rawTranscript || "",
       };
 
-      const res = await fetch(`${backendUrl}/api/consultation/${pid}/save`, {
+      const res = await fetch(`${backendUrl}/api/consultation/${encodeURIComponent(pid)}/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

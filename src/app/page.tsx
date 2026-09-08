@@ -167,8 +167,11 @@ function DoctorConsultScreenContent() {
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-mono">
                   {patientAge} yrs • {patientGender}
                 </span>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/30 font-mono">
-                  ID #{patientId}
+                <span
+                  className="text-xs px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/30 font-mono"
+                  title={patientId}
+                >
+                  {patientId.length > 10 ? `Ref: ${patientId.slice(0, 8)}` : `ID #${patientId}`}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">

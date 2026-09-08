@@ -30,7 +30,11 @@ def init_db_safely():
         print("[ShifaScribe DB Warning] Please verify your database credentials in .env file.")
 
 def ensure_db_columns():
-    """Safety migration helper to ensure new columns exist in SQLite/PostgreSQL/Supabase database."""
+    """
+    Comprehensive migration helper: adds ALL columns that may be missing from
+    Supabase Cloud or local PostgreSQL / SQLite databases so that models.py
+    ORM definitions always have the columns they reference.
+    """
     try:
         if engine.dialect.name == "sqlite":
             with engine.connect() as conn:
@@ -45,15 +49,33 @@ def ensure_db_columns():
                     print("[ShifaScribe DB Migration] Added 'structured_ehr' column to consultation_logs!")
                 conn.commit()
         elif engine.dialect.name == "postgresql":
+            from sqlalchemy import text
             with engine.connect() as conn:
-                from sqlalchemy import text
+                # ── patients table ──────────────────────────────────────────
                 conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS gender VARCHAR(50) DEFAULT 'Male';"))
                 conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS opd_token VARCHAR(50);"))
                 conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS cnic VARCHAR(50);"))
+                try:
+                    conn.execute(text("ALTER TABLE patients ALTER COLUMN cnic DROP NOT NULL;"))
+                except Exception:
+                    pass
+                # ── doctors table ───────────────────────────────────────────
+                conn.execute(text("ALTER TABLE doctors ADD COLUMN IF NOT EXISTS department VARCHAR(100);"))
+                conn.execute(text("ALTER TABLE doctors ADD COLUMN IF NOT EXISTS specialty VARCHAR(255);"))
+                conn.execute(text("ALTER TABLE doctors ADD COLUMN IF NOT EXISTS room_number VARCHAR(50);"))
+                # ── consultation_logs table ──────────────────────────────────
+                conn.execute(text("ALTER TABLE consultation_logs ADD COLUMN IF NOT EXISTS file_size_kb FLOAT DEFAULT 0;"))
+                conn.execute(text("ALTER TABLE consultation_logs ADD COLUMN IF NOT EXISTS mime_type VARCHAR(50) DEFAULT 'audio/webm';"))
+                conn.execute(text("ALTER TABLE consultation_logs ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'recorded';"))
                 conn.execute(text("ALTER TABLE consultation_logs ADD COLUMN IF NOT EXISTS transcription_text TEXT;"))
                 conn.execute(text("ALTER TABLE consultation_logs ADD COLUMN IF NOT EXISTS structured_ehr TEXT;"))
+                try:
+                    conn.execute(text("ALTER TABLE consultation_logs ALTER COLUMN doctor_id DROP NOT NULL;"))
+                    conn.execute(text("ALTER TABLE consultation_logs ALTER COLUMN audio_file_path DROP NOT NULL;"))
+                except Exception:
+                    pass
                 conn.commit()
-                print("[ShifaScribe DB Migration] Verified/migrated PostgreSQL/Supabase columns successfully!")
+                print("[ShifaScribe DB Migration] Verified/migrated ALL PostgreSQL/Supabase columns successfully!")
     except Exception as err:
         print(f"[ShifaScribe DB Migration Info] Column check: {err}")
 
@@ -61,26 +83,29 @@ def seed_initial_data():
     """Seeds default OPD demo patient and doctor records if they don't exist."""
     try:
         with SessionLocal() as db:
-            doc = db.query(models.Doctor).filter(models.Doctor.id == 4).first()
+            # Search by name (works for both UUID and Integer ID databases)
+            doc = db.query(models.Doctor).filter(models.Doctor.name == "Dr. Arsam Khan").first()
             if not doc:
                 doc = models.Doctor(
-                    id=4,
                     name="Dr. Arsam Khan",
                     department="General Medicine",
+                    specialty="General Medicine",
                     room_number="OPD Room #4"
                 )
                 db.add(doc)
-            pat = db.query(models.Patient).filter(models.Patient.id == 104).first()
+                db.commit()
+                db.refresh(doc)
+            pat = db.query(models.Patient).filter(models.Patient.name == "Muhammad Tariq").first()
             if not pat:
                 pat = models.Patient(
-                    id=104,
                     name="Muhammad Tariq",
                     age=45,
                     gender="Male",
+                    cnic="61101-1040001-1",
                     opd_token="#104"
                 )
                 db.add(pat)
-            db.commit()
+                db.commit()
             print("[ShifaScribe DB Seeder] Seeded default OPD Doctor & Patient records!")
     except Exception as e:
         print(f"[ShifaScribe DB Seeder Info] Seed check: {e}")
@@ -88,6 +113,64 @@ def seed_initial_data():
 init_db_safely()
 ensure_db_columns()
 seed_initial_data()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# UUID/Integer-safe ID lookup helpers
+# ─────────────────────────────────────────────────────────────────────────────
+def _find_patient_by_id(db: "Session", patient_id_str: str):
+    """Find a patient by integer ID, UUID string, or OPD token — works with both schemas."""
+    clean = str(patient_id_str).strip().lstrip("#")
+    # Try by OPD token first
+    pat = db.query(models.Patient).filter(models.Patient.opd_token == f"#{clean}").first()
+    if pat:
+        return pat
+    pat = db.query(models.Patient).filter(models.Patient.opd_token == patient_id_str.strip()).first()
+    if pat:
+        return pat
+    # Try by UUID
+    try:
+        import uuid as _u
+        uid = _u.UUID(str(patient_id_str).strip())
+        pat = db.query(models.Patient).filter(models.Patient.id == uid).first()
+        if pat:
+            return pat
+    except (ValueError, AttributeError):
+        pass
+    # Try by integer ID (for local Docker PostgreSQL)
+    if clean.isdigit():
+        try:
+            pat = db.query(models.Patient).filter(models.Patient.id == int(clean)).first()
+            if pat:
+                return pat
+        except Exception:
+            pass
+    # Try by name
+    pat = db.query(models.Patient).filter(models.Patient.name.ilike(f"%{clean}%")).first()
+    return pat
+
+def _find_doctor_by_id(db: "Session", doctor_id_str: str):
+    """Find a doctor by integer ID, UUID string, or name — works with both schemas."""
+    clean = str(doctor_id_str).strip()
+    # Try by UUID
+    try:
+        import uuid as _u
+        uid = _u.UUID(clean)
+        doc = db.query(models.Doctor).filter(models.Doctor.id == uid).first()
+        if doc:
+            return doc
+    except (ValueError, AttributeError):
+        pass
+    # Try by integer ID
+    if clean.isdigit():
+        try:
+            doc = db.query(models.Doctor).filter(models.Doctor.id == int(clean)).first()
+            if doc:
+                return doc
+        except Exception:
+            pass
+    # Try by name
+    doc = db.query(models.Doctor).filter(models.Doctor.name.ilike(f"%{clean}%")).first()
+    return doc
 
 app = FastAPI(
     title="ShifaScribe AI Medical Scribe API",
@@ -229,11 +312,24 @@ def process_transcription_task(task_id: str, raw_file_path: str, consultation_id
         if consultation_id:
             try:
                 db = SessionLocal()
-                consultation = db.query(models.ConsultationLog).filter(models.ConsultationLog.id == consultation_id).first()
+                consultation = None
+                if isinstance(consultation_id, str):
+                    try:
+                        import uuid as _u
+                        cid = _u.UUID(consultation_id)
+                        consultation = db.query(models.ConsultationLog).filter(models.ConsultationLog.id == cid).first()
+                    except Exception:
+                        if consultation_id.isdigit():
+                            consultation = db.query(models.ConsultationLog).filter(models.ConsultationLog.id == int(consultation_id)).first()
+                else:
+                    consultation = db.query(models.ConsultationLog).filter(models.ConsultationLog.id == consultation_id).first()
+
                 if consultation:
                     consultation.status = "completed"
                     consultation.transcription_text = transcribed_text
+                    consultation.raw_transcript = transcribed_text
                     consultation.structured_ehr = json.dumps(structured_ehr)
+                    consultation.structured_data = structured_ehr
                     db.commit()
                     print(f"[ShifaScribe DB] Updated ConsultationLog (id={consultation_id}) with transcription & structured EHR JSON!")
                 db.close()
@@ -274,8 +370,8 @@ def health_check():
 async def upload_consultation_audio(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    patient_id: Optional[int] = Form(None),
-    doctor_id: Optional[int] = Form(None),
+    patient_id: Optional[str] = Form(None),
+    doctor_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     try:
@@ -292,47 +388,66 @@ async def upload_consultation_audio(
         with open(saved_file_path, "wb") as f:
             f.write(contents)
 
-        # Validate and resolve foreign keys safely for PostgreSQL
+        # Validate and resolve foreign keys safely (handles UUID and Integer IDs)
         valid_patient_id = None
         if patient_id is not None:
-            patient_exists = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
+            patient_exists = _find_patient_by_id(db, patient_id)
             if patient_exists:
-                valid_patient_id = patient_id
+                valid_patient_id = patient_exists.id
             else:
                 try:
+                    import random
                     new_patient = models.Patient(
-                        id=patient_id,
                         name=f"Patient #{patient_id}",
                         age=40,
                         gender="Unknown",
+                        cnic=f"61101-{random.randint(1000000, 9999999)}-{random.randint(1, 9)}",
                         opd_token=f"#{patient_id}"
                     )
                     db.add(new_patient)
                     db.commit()
-                    valid_patient_id = patient_id
+                    valid_patient_id = new_patient.id
                 except Exception:
                     db.rollback()
                     valid_patient_id = None
 
+        if valid_patient_id is None:
+            pat = db.query(models.Patient).first()
+            if not pat:
+                pat = models.Patient(name="Muhammad Tariq", age=45, gender="Male", cnic="61101-1040001-1", opd_token="#104")
+                db.add(pat)
+                db.commit()
+                db.refresh(pat)
+            valid_patient_id = pat.id
+
         valid_doctor_id = None
         if doctor_id is not None:
-            doctor_exists = db.query(models.Doctor).filter(models.Doctor.id == doctor_id).first()
+            doctor_exists = _find_doctor_by_id(db, doctor_id)
             if doctor_exists:
-                valid_doctor_id = doctor_id
+                valid_doctor_id = doctor_exists.id
             else:
                 try:
                     new_doctor = models.Doctor(
-                        id=doctor_id,
                         name=f"Doctor #{doctor_id}",
                         department="General OPD",
+                        specialty="General OPD",
                         room_number=f"Room #{doctor_id}"
                     )
                     db.add(new_doctor)
                     db.commit()
-                    valid_doctor_id = doctor_id
+                    valid_doctor_id = new_doctor.id
                 except Exception:
                     db.rollback()
                     valid_doctor_id = None
+
+        if valid_doctor_id is None:
+            doc = db.query(models.Doctor).first()
+            if not doc:
+                doc = models.Doctor(name="Dr. Arsam Khan", department="General Medicine", specialty="General Medicine", room_number="OPD Room #4")
+                db.add(doc)
+                db.commit()
+                db.refresh(doc)
+            valid_doctor_id = doc.id
 
         # Save record to database
         consultation_entry = models.ConsultationLog(
@@ -436,8 +551,10 @@ def get_dashboard_metrics(db: Session = Depends(get_db)):
                     medication_counter[str(m).strip()] += 1
 
         # Build live stream feed item
-        patient_token = f"#{log.patient_id or log.id}"
-        room = log.doctor.room_number if log.doctor else f"OPD Room #{log.doctor_id or 4}"
+        patient_token = getattr(log.patient, 'opd_token', None) if log.patient else None
+        if not patient_token:
+            patient_token = f"#{str(log.patient_id or log.id)[:8]}"
+        room = getattr(log.doctor, 'room_number', None) or getattr(log.doctor, 'department', None) or "OPD Room #4" if log.doctor else f"OPD Room #{str(log.doctor_id or '4')[:8]}"
         time_str = log.created_at.strftime("%I:%M %p") if log.created_at else "Just recorded"
         symptoms_str = ", ".join(symptoms) if symptoms else (log.transcription_text or "General OPD")
         rx_str = ", ".join(medications) if medications else (ehr_data.get("dosage_frequency") or "Routine Prescribed")
@@ -590,20 +707,23 @@ def get_patient_history(
 
     if clean_query.lower() == "all":
         pass  # return all recent records
-    elif clean_id.isdigit():
-        num_id = int(clean_id)
-        query = query.filter(
-            (models.ConsultationLog.patient_id == num_id)
-            | (models.Patient.id == num_id)
-            | (models.Patient.opd_token == f"#{num_id}")
-            | (models.Patient.opd_token == str(num_id))
-        )
     else:
-        query = query.filter(
-            (models.Patient.opd_token.ilike(f"%{clean_query}%"))
-            | (models.Patient.name.ilike(f"%{clean_query}%"))
-            | (models.ConsultationLog.transcription_text.ilike(f"%{clean_query}%"))
-        )
+        # Try to find the patient using UUID-safe helper first
+        found_patient = _find_patient_by_id(db, clean_query)
+        if found_patient:
+            query = query.filter(models.ConsultationLog.patient_id == found_patient.id)
+        elif clean_id.isdigit():
+            # Fallback: filter by opd_token for numeric queries
+            query = query.filter(
+                (models.Patient.opd_token == f"#{clean_id}")
+                | (models.Patient.opd_token == str(clean_id))
+            )
+        else:
+            query = query.filter(
+                (models.Patient.opd_token.ilike(f"%{clean_query}%"))
+                | (models.Patient.name.ilike(f"%{clean_query}%"))
+                | (models.ConsultationLog.transcription_text.ilike(f"%{clean_query}%"))
+            )
 
     # Chronological descending order (newest encounters first)
     logs = query.order_by(models.ConsultationLog.created_at.desc()).limit(limit).all()
@@ -617,12 +737,14 @@ def get_patient_history(
             except Exception:
                 ehr = {}
 
-        pat_name = log.patient.name if log.patient else f"Patient #{log.patient_id or 104}"
+        pat_name = log.patient.name if log.patient else f"Patient #{log.patient_id or 'Unknown'}"
         pat_age = log.patient.age if log.patient else 45
-        pat_gender = log.patient.gender if log.patient else "Male"
-        pat_token = log.patient.opd_token if log.patient else f"#{log.patient_id or 104}"
-        doc_name = log.doctor.name if log.doctor else f"Doctor #{log.doctor_id or 4}"
-        doc_dept = log.doctor.department if log.doctor else "General Medicine OPD"
+        pat_gender = getattr(log.patient, 'gender', 'Male') if log.patient else "Male"
+        pat_token = getattr(log.patient, 'opd_token', None) if log.patient else None
+        if not pat_token:
+            pat_token = f"#{log.patient_id or 'Unknown'}"
+        doc_name = log.doctor.name if log.doctor else f"Doctor #{log.doctor_id or 'Unknown'}"
+        doc_dept = getattr(log.doctor, 'department', None) or getattr(log.doctor, 'specialty', None) or "General Medicine OPD" if log.doctor else "General Medicine OPD"
 
         symptoms = ehr.get("symptoms", [])
         medications = ehr.get("medications", [])
@@ -632,17 +754,17 @@ def get_patient_history(
         clinical_notes = ehr.get("clinical_notes", "Routine OPD follow-up.")
 
         history.append({
-            "consultation_id": log.id,
-            "patient_id": log.patient_id or 104,
+            "consultation_id": str(log.id),
+            "patient_id": str(log.patient_id) if log.patient_id else "Unknown",
             "patient_name": pat_name,
             "patient_age": pat_age,
-            "patient_gender": pat_gender,
+            "patient_gender": pat_gender or "Male",
             "opd_token": pat_token,
             "doctor_name": doc_name,
             "doctor_department": doc_dept,
             "encounter_date": log.created_at.strftime("%b %d, %Y • %I:%M %p") if log.created_at else "Aug 26, 2026 • 11:30 AM",
             "created_at_iso": log.created_at.isoformat() if log.created_at else datetime.utcnow().isoformat(),
-            "status": log.status,
+            "status": log.status or "recorded",
             "raw_transcription": log.transcription_text or "",
             "symptoms": symptoms,
             "medications": medications,
@@ -650,7 +772,7 @@ def get_patient_history(
             "dosage_frequency": dosage_freq,
             "duration": duration,
             "clinical_notes": clinical_notes,
-            "file_size_kb": log.file_size_kb,
+            "file_size_kb": log.file_size_kb or 0.0,
         })
 
     # If DB returns 0 encounters for a new/unseeded query, provide realistic historical demo records
@@ -721,11 +843,12 @@ class PatientCreateRequest(BaseModel):
     name: str
     age: Optional[int] = 40
     gender: Optional[str] = "Male"
+    cnic: Optional[str] = None
     opd_token: Optional[str] = None
 
 class ConsultationSaveRequest(BaseModel):
-    consultation_id: Optional[int] = None
-    doctor_id: Optional[int] = 4
+    consultation_id: Optional[str] = None
+    doctor_id: Optional[str] = None
     symptoms: Optional[List[str]] = []
     medications: Optional[List[str]] = []
     medications_detailed: Optional[List[Dict[str, Any]]] = []
@@ -774,11 +897,16 @@ def create_new_patient(payload: PatientCreateRequest, db: Session = Depends(get_
     """
     try:
         clean_token = get_next_available_opd_token(db, payload.opd_token)
+        clean_cnic = payload.cnic.strip() if payload.cnic and payload.cnic.strip() else None
+        if not clean_cnic:
+            import random
+            clean_cnic = f"61101-{random.randint(1000000, 9999999)}-{random.randint(1, 9)}"
 
         new_patient = models.Patient(
             name=payload.name.strip(),
             age=payload.age or 40,
             gender=payload.gender or "Male",
+            cnic=clean_cnic,
             opd_token=clean_token,
         )
         db.add(new_patient)
@@ -790,10 +918,11 @@ def create_new_patient(payload: PatientCreateRequest, db: Session = Depends(get_
         return {
             "status": "success",
             "message": "Patient intake registered successfully",
-            "patient_id": new_patient.id,
+            "patient_id": str(new_patient.id),
             "name": new_patient.name,
             "age": new_patient.age,
             "gender": new_patient.gender,
+            "cnic": new_patient.cnic,
             "opd_token": new_patient.opd_token,
             "created_at": new_patient.created_at.isoformat() if new_patient.created_at else datetime.utcnow().isoformat(),
         }
@@ -807,18 +936,9 @@ def create_new_patient(payload: PatientCreateRequest, db: Session = Depends(get_
 @app.get("/api/patients/{patient_id}")
 def get_patient_profile(patient_id: str, db: Session = Depends(get_db)):
     """
-    Fetches patient profile details by numeric ID or OPD token.
+    Fetches patient profile details by numeric ID, UUID, OPD token, or name.
     """
-    clean_id = patient_id.strip().lstrip("#")
-    patient = None
-    if clean_id.isdigit():
-        patient = db.query(models.Patient).filter(models.Patient.id == int(clean_id)).first()
-    if not patient:
-        patient = db.query(models.Patient).filter(
-            (models.Patient.opd_token == patient_id.strip())
-            | (models.Patient.opd_token == f"#{clean_id}")
-            | (models.Patient.name.ilike(f"%{clean_id}%"))
-        ).first()
+    patient = _find_patient_by_id(db, patient_id)
 
     if not patient:
         raise HTTPException(
@@ -828,17 +948,17 @@ def get_patient_profile(patient_id: str, db: Session = Depends(get_db)):
 
     return {
         "status": "success",
-        "patient_id": patient.id,
+        "patient_id": str(patient.id),
         "name": patient.name,
         "age": patient.age,
-        "gender": patient.gender,
-        "opd_token": patient.opd_token,
+        "gender": patient.gender or "Male",
+        "opd_token": patient.opd_token or f"#{patient_id}",
         "created_at": patient.created_at.isoformat() if patient.created_at else datetime.utcnow().isoformat(),
     }
 
 @app.post("/api/consultation/{patient_id}/save")
 def save_consultation_payload(
-    patient_id: int,
+    patient_id: str,
     payload: ConsultationSaveRequest,
     db: Session = Depends(get_db),
 ):
@@ -848,18 +968,38 @@ def save_consultation_payload(
     """
     try:
         # Verify patient exists (or create if missing)
-        patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
+        patient = _find_patient_by_id(db, patient_id)
         if not patient:
+            import random
             patient = models.Patient(
-                id=patient_id,
                 name=f"Patient #{patient_id}",
                 age=40,
                 gender="Male",
+                cnic=f"61101-{random.randint(1000000, 9999999)}-{random.randint(1, 9)}",
                 opd_token=f"#{patient_id}"
             )
             db.add(patient)
             db.commit()
             db.refresh(patient)
+
+        # Resolve doctor ID (guaranteed valid in Supabase)
+        resolved_doctor_id = None
+        if payload.doctor_id:
+            doc = _find_doctor_by_id(db, payload.doctor_id)
+            resolved_doctor_id = doc.id if doc else None
+        if not resolved_doctor_id:
+            doc = db.query(models.Doctor).first()
+            if not doc:
+                doc = models.Doctor(
+                    name="Dr. Arsam Khan",
+                    department="General Medicine",
+                    specialty="General Medicine",
+                    room_number="OPD Room #4"
+                )
+                db.add(doc)
+                db.commit()
+                db.refresh(doc)
+            resolved_doctor_id = doc.id
 
         # Structure EHR dictionary
         structured_ehr_data = {
@@ -876,49 +1016,64 @@ def save_consultation_payload(
         # Find existing consultation log or create new
         consultation = None
         if payload.consultation_id:
-            consultation = db.query(models.ConsultationLog).filter(
-                models.ConsultationLog.id == payload.consultation_id
-            ).first()
+            try:
+                import uuid as _u
+                cid = _u.UUID(payload.consultation_id)
+                consultation = db.query(models.ConsultationLog).filter(
+                    models.ConsultationLog.id == cid
+                ).first()
+            except (ValueError, AttributeError):
+                if payload.consultation_id.isdigit():
+                    try:
+                        consultation = db.query(models.ConsultationLog).filter(
+                            models.ConsultationLog.id == int(payload.consultation_id)
+                        ).first()
+                    except Exception:
+                        pass
 
         if not consultation:
             # Check if there's an existing consultation for this patient
             consultation = db.query(models.ConsultationLog).filter(
-                models.ConsultationLog.patient_id == patient_id
+                models.ConsultationLog.patient_id == patient.id
             ).order_by(models.ConsultationLog.created_at.desc()).first()
 
         if consultation:
             # Update existing record
             consultation.status = "completed"
             consultation.structured_ehr = structured_ehr_json
+            consultation.structured_data = structured_ehr_data
             if payload.transcription_text:
                 consultation.transcription_text = payload.transcription_text
-            if payload.doctor_id:
-                consultation.doctor_id = payload.doctor_id
+                consultation.raw_transcript = payload.transcription_text
+            if resolved_doctor_id:
+                consultation.doctor_id = resolved_doctor_id
             db.commit()
             db.refresh(consultation)
-            print(f"[ShifaScribe DB] Updated ConsultationLog #{consultation.id} for Patient #{patient_id}")
+            print(f"[ShifaScribe DB] Updated ConsultationLog #{consultation.id} for Patient #{patient.id}")
         else:
             # Create a new consultation record
             consultation = models.ConsultationLog(
-                patient_id=patient_id,
-                doctor_id=payload.doctor_id or 4,
+                patient_id=patient.id,
+                doctor_id=resolved_doctor_id,
                 audio_file_path="manual_consultation_save",
                 file_size_kb=0.0,
                 mime_type="application/json",
                 status="completed",
                 transcription_text=payload.transcription_text or "",
+                raw_transcript=payload.transcription_text or "",
                 structured_ehr=structured_ehr_json,
+                structured_data=structured_ehr_data,
             )
             db.add(consultation)
             db.commit()
             db.refresh(consultation)
-            print(f"[ShifaScribe DB] Created new ConsultationLog #{consultation.id} for Patient #{patient_id}")
+            print(f"[ShifaScribe DB] Created new ConsultationLog #{consultation.id} for Patient #{patient.id}")
 
         return {
             "status": "saved",
             "message": "Prescription and EHR record successfully stored in database",
-            "consultation_id": consultation.id,
-            "patient_id": patient_id,
+            "consultation_id": str(consultation.id),
+            "patient_id": str(patient.id),
             "patient_name": patient.name,
             "opd_token": patient.opd_token,
             "structured_ehr": structured_ehr_data,
@@ -930,6 +1085,7 @@ def save_consultation_payload(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save consultation: {str(e)}",
         )
+
 
 
 
