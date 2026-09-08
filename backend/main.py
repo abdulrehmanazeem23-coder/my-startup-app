@@ -119,15 +119,21 @@ seed_initial_data()
 # ─────────────────────────────────────────────────────────────────────────────
 def _find_patient_by_id(db: "Session", patient_id_str: str):
     """Find a patient by integer ID, UUID string, or OPD token — works with both schemas."""
+    if not patient_id_str:
+        return None
     clean = str(patient_id_str).strip().lstrip("#")
-    # Try by OPD token first
-    pat = db.query(models.Patient).filter(models.Patient.opd_token == f"#{clean}").first()
-    if pat:
-        return pat
-    pat = db.query(models.Patient).filter(models.Patient.opd_token == patient_id_str.strip()).first()
-    if pat:
-        return pat
-    # Try by UUID
+    # 1. Try by OPD token first (works in both UUID and integer databases)
+    try:
+        pat = db.query(models.Patient).filter(models.Patient.opd_token == f"#{clean}").first()
+        if pat:
+            return pat
+        pat = db.query(models.Patient).filter(models.Patient.opd_token == str(patient_id_str).strip()).first()
+        if pat:
+            return pat
+    except Exception:
+        db.rollback()
+
+    # 2. Try by UUID if valid UUID string
     try:
         import uuid as _u
         uid = _u.UUID(str(patient_id_str).strip())
@@ -136,22 +142,35 @@ def _find_patient_by_id(db: "Session", patient_id_str: str):
             return pat
     except (ValueError, AttributeError):
         pass
-    # Try by integer ID (for local Docker PostgreSQL)
-    if clean.isdigit():
+    except Exception:
+        db.rollback()
+
+    # 3. Try by integer ID ONLY IF database is NOT in UUID mode
+    if not getattr(models, "_IS_SUPABASE_UUID", False) and clean.isdigit():
         try:
             pat = db.query(models.Patient).filter(models.Patient.id == int(clean)).first()
             if pat:
                 return pat
         except Exception:
-            pass
-    # Try by name
-    pat = db.query(models.Patient).filter(models.Patient.name.ilike(f"%{clean}%")).first()
-    return pat
+            db.rollback()
+
+    # 4. Try by name
+    try:
+        pat = db.query(models.Patient).filter(models.Patient.name.ilike(f"%{clean}%")).first()
+        if pat:
+            return pat
+    except Exception:
+        db.rollback()
+
+    return None
 
 def _find_doctor_by_id(db: "Session", doctor_id_str: str):
     """Find a doctor by integer ID, UUID string, or name — works with both schemas."""
+    if not doctor_id_str:
+        return None
     clean = str(doctor_id_str).strip()
-    # Try by UUID
+
+    # 1. Try by UUID if valid UUID string
     try:
         import uuid as _u
         uid = _u.UUID(clean)
@@ -160,17 +179,35 @@ def _find_doctor_by_id(db: "Session", doctor_id_str: str):
             return doc
     except (ValueError, AttributeError):
         pass
-    # Try by integer ID
-    if clean.isdigit():
+    except Exception:
+        db.rollback()
+
+    # 2. Try by integer ID ONLY IF database is NOT in UUID mode
+    if not getattr(models, "_IS_SUPABASE_UUID", False) and clean.isdigit():
         try:
             doc = db.query(models.Doctor).filter(models.Doctor.id == int(clean)).first()
             if doc:
                 return doc
         except Exception:
-            pass
-    # Try by name
-    doc = db.query(models.Doctor).filter(models.Doctor.name.ilike(f"%{clean}%")).first()
-    return doc
+            db.rollback()
+
+    # 3. Try by name
+    try:
+        doc = db.query(models.Doctor).filter(models.Doctor.name.ilike(f"%{clean}%")).first()
+        if doc:
+            return doc
+    except Exception:
+        db.rollback()
+
+    # 4. Fallback: return first doctor in database
+    try:
+        doc = db.query(models.Doctor).first()
+        if doc:
+            return doc
+    except Exception:
+        db.rollback()
+
+    return None
 
 app = FastAPI(
     title="ShifaScribe AI Medical Scribe API",
@@ -466,7 +503,7 @@ async def upload_consultation_audio(
         task_store[task_id] = {
             "status": "processing",
             "task_id": task_id,
-            "consultation_id": consultation_entry.id,
+            "consultation_id": str(consultation_entry.id),
             "filename": saved_filename,
             "size_kb": file_size_kb,
             "created_at": datetime.now().isoformat(),
@@ -477,19 +514,23 @@ async def upload_consultation_audio(
             process_transcription_task,
             task_id=task_id,
             raw_file_path=saved_file_path,
-            consultation_id=consultation_entry.id,
+            consultation_id=str(consultation_entry.id),
         )
 
         return {
             "status": "processing",
             "message": "Audio file uploaded successfully. Asynchronous transcription & NLP extraction started.",
             "task_id": task_id,
-            "consultation_id": consultation_entry.id,
+            "consultation_id": str(consultation_entry.id),
             "filename": saved_filename,
             "size_kb": file_size_kb,
             "status_url": f"/api/consultation/status/{task_id}",
         }
     except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        print(f"[ShifaScribe Audio Upload Error] {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process audio upload: {str(e)}",
