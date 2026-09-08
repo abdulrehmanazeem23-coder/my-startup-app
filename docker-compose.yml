@@ -34,7 +34,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/shifascribe_db
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/shifascribe_db}
       - PYTHONUNBUFFERED=1
       - PYTHONIOENCODING=utf-8
     depends_on:

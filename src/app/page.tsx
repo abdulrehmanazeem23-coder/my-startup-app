@@ -156,7 +156,7 @@ function DoctorConsultScreenContent() {
         {/* Patient Quick Context Card (Hidden on Print) */}
         <section className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-lg print:hidden relative overflow-hidden">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 font-bold text-lg font-mono">
+            <div className="min-w-[4.5rem] px-3.5 h-12 rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 font-bold text-base font-mono whitespace-nowrap shadow-sm">
               {patientToken}
             </div>
             <div>

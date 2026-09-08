@@ -717,33 +717,52 @@ class ConsultationSaveRequest(BaseModel):
     clinical_notes: Optional[str] = None
     transcription_text: Optional[str] = None
 
+def get_next_available_opd_token(db: Session, preferred_token: Optional[str] = None) -> str:
+    """
+    Generates a clean sequential OPD Token like '#105', '#106', '#208', '#209' without any suffixes.
+    """
+    if preferred_token and preferred_token.strip():
+        tok = preferred_token.strip()
+        if not tok.startswith("#"):
+            tok = f"#{tok}"
+        exists = db.query(models.Patient).filter(models.Patient.opd_token == tok).first()
+        if not exists:
+            return tok
+        digits = "".join(filter(str.isdigit, tok))
+        start_num = int(digits) if digits else 104
+    else:
+        start_num = 104
+
+    all_tokens = db.query(models.Patient.opd_token).all()
+    max_num = start_num
+    for (t,) in all_tokens:
+        if t:
+            digits = "".join(filter(str.isdigit, t))
+            if digits:
+                n = int(digits)
+                if n > max_num:
+                    max_num = n
+
+    next_num = max_num + 1
+    while db.query(models.Patient).filter(models.Patient.opd_token == f"#{next_num}").first():
+        next_num += 1
+
+    return f"#{next_num}"
+
 @app.post("/api/patients/new", status_code=status.HTTP_201_CREATED)
 def create_new_patient(payload: PatientCreateRequest, db: Session = Depends(get_db)):
     """
     Day 28 Task 1: Creates a new patient in PostgreSQL/Supabase database.
-    Returns generated patient_id and OPD token.
+    Returns generated patient_id and clean OPD token.
     """
     try:
-        token = payload.opd_token
-        if not token:
-            latest = db.query(models.Patient).order_by(models.Patient.id.desc()).first()
-            next_num = (latest.id + 104) if latest and latest.id else 105
-            token = f"#{next_num}"
-        else:
-            token = token.strip()
-            if not token.startswith("#"):
-                token = f"#{token}"
-
-        # Ensure token uniqueness
-        existing = db.query(models.Patient).filter(models.Patient.opd_token == token).first()
-        if existing:
-            token = f"{token}-{uuid.uuid4().hex[:3].upper()}"
+        clean_token = get_next_available_opd_token(db, payload.opd_token)
 
         new_patient = models.Patient(
             name=payload.name.strip(),
             age=payload.age or 40,
             gender=payload.gender or "Male",
-            opd_token=token,
+            opd_token=clean_token,
         )
         db.add(new_patient)
         db.commit()
