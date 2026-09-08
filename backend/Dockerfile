@@ -33,7 +33,7 @@ RUN mkdir -p /app/storage/audio
 EXPOSE 8000
 
 # Health check probe
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Launch FastAPI server with Uvicorn
