@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   BarChart,
@@ -19,7 +19,7 @@ import {
 } from "recharts";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MOCK DATA ARRAYS (Day 23 Administrative Surveillance & Drug Allocation)
+// DATA TYPES & BASELINE DATASETS (Live PostgreSQL / Supabase Integration)
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface SymptomFrequencyItem {
@@ -30,7 +30,7 @@ interface SymptomFrequencyItem {
   growth: string;
 }
 
-const SYMPTOM_DATA: SymptomFrequencyItem[] = [
+const INITIAL_SYMPTOMS: SymptomFrequencyItem[] = [
   { symptom: "High Fever / Pyrexia", count: 480, category: "General", urgency: "Medium", growth: "+8.4%" },
   { symptom: "Severe Headache / Migraine", count: 395, category: "General", urgency: "Low", growth: "+3.1%" },
   { symptom: "Dengue Rash & Thrombocytopenia", count: 342, category: "Vector-Borne", urgency: "High", growth: "+38.5%" },
@@ -43,9 +43,7 @@ const SYMPTOM_DATA: SymptomFrequencyItem[] = [
   { symptom: "Sore Throat & Pharyngitis", count: 92, category: "Respiratory", urgency: "Low", growth: "-6.2%" },
 ];
 
-const DAILY_EPIDEMIC_TRENDS = [
-  { day: "Day 17", dengue: 22, diarrhea: 28, respiratory: 36, fever: 54 },
-  { day: "Day 18", dengue: 29, diarrhea: 31, respiratory: 34, fever: 58 },
+const INITIAL_DAILY_TRENDS = [
   { day: "Day 19", dengue: 38, diarrhea: 35, respiratory: 32, fever: 64 },
   { day: "Day 20", dengue: 46, diarrhea: 40, respiratory: 35, fever: 69 },
   { day: "Day 21", dengue: 58, diarrhea: 46, respiratory: 31, fever: 76 },
@@ -62,7 +60,7 @@ interface MedicationAllocationItem {
   depletionRate: string;
 }
 
-const MEDICATION_ALLOCATION_DATA: MedicationAllocationItem[] = [
+const INITIAL_MEDICATIONS: MedicationAllocationItem[] = [
   { name: "Tab. Panadol 500mg", generic: "Paracetamol", volume: 1240, category: "Analgesic", stockLevel: 88, depletionRate: "Very High" },
   { name: "Tab. Augmentin 625mg", generic: "Co-Amoxiclav", volume: 890, category: "Antibiotic", stockLevel: 64, depletionRate: "High" },
   { name: "Cap. Risek 40mg", generic: "Omeprazole", volume: 760, category: "PPI / GI", stockLevel: 72, depletionRate: "High" },
@@ -75,7 +73,7 @@ const MEDICATION_ALLOCATION_DATA: MedicationAllocationItem[] = [
   { name: "Tab. Ponstan 500mg", generic: "Mefenamic Acid", volume: 250, category: "Analgesic", stockLevel: 83, depletionRate: "Low" },
 ];
 
-const MED_CATEGORY_SHARE = [
+const INITIAL_CATEGORY_SHARE = [
   { name: "Antibiotics", value: 2320, color: "#06b6d4" },
   { name: "Analgesics & Antipyretics", value: 1490, color: "#10b981" },
   { name: "PPI & Gastrointestinal", value: 1050, color: "#8b5cf6" },
@@ -83,12 +81,11 @@ const MED_CATEGORY_SHARE = [
   { name: "Antihistamines & Allergy", value: 310, color: "#ec4899" },
 ];
 
-const RECENT_LIVE_SURVEILLANCE_FEED = [
+const INITIAL_RECENT_FEED = [
   { token: "#108", region: "Rawalpindi Outpost B", symptoms: "Dengue rash, High fever, Retro-orbital headache", rx: "Tab. Panadol 500mg (TDS), ORS Hydration", flag: "Dengue Positive", time: "3 mins ago" },
   { token: "#107", region: "Islamabad Sector G-9", symptoms: "Watery diarrhea, Abdominal cramps, Vomiting", rx: "Tab. Flagyl 400mg (BID), Cap. Risek 40mg (OD)", flag: "Gastroenteritis", time: "8 mins ago" },
   { token: "#106", region: "Rawalpindi Central OPD", symptoms: "Severe migraine, Neck stiffness, Fever", rx: "Tab. Panadol 500mg (BID), Tab. Brufen 400mg", flag: "Routine Febrile", time: "14 mins ago" },
   { token: "#105", region: "Lahore Model Town OPD", symptoms: "Productive cough, Wheezing, Dyspnea", rx: "Tab. Augmentin 625mg (TDS), Syp. Hydryllin", flag: "Respiratory URI", time: "22 mins ago" },
-  { token: "#104", region: "Islamabad OPD Block B", symptoms: "Fever for 2 days, Severe headache", rx: "Tab. Panadol 200mg (BID), Tab. Augmentin 500mg", flag: "Routine Scribe", time: "31 mins ago" },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,11 +97,59 @@ export default function AdminAnalyticsDashboard() {
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>("7d");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
+  // Dynamic Live State Connected to FastAPI / Supabase PostgreSQL
+  const [symptomsData, setSymptomsData] = useState<SymptomFrequencyItem[]>(INITIAL_SYMPTOMS);
+  const [medicationsData, setMedicationsData] = useState<MedicationAllocationItem[]>(INITIAL_MEDICATIONS);
+  const [dailyTrends, setDailyTrends] = useState(INITIAL_DAILY_TRENDS);
+  const [categoryShare, setCategoryShare] = useState(INITIAL_CATEGORY_SHARE);
+  const [recentFeed, setRecentFeed] = useState(INITIAL_RECENT_FEED);
+  const [totalConsultations, setTotalConsultations] = useState<number>(1842);
+  const [dengueCount, setDengueCount] = useState<number>(342);
+  const [diarrheaCount, setDiarrheaCount] = useState<number>(285);
+  const [drapUnits, setDrapUnits] = useState<number>(5680);
+  const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
+  // Live Data Fetching Mechanism
+  useEffect(() => {
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+    async function fetchDashboardMetrics() {
+      try {
+        setIsRefreshing(true);
+        const res = await fetch(`${backendUrl}/api/dashboard/metrics`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.status === "success") {
+          if (data.top_symptoms) setSymptomsData(data.top_symptoms);
+          if (data.top_medications) setMedicationsData(data.top_medications);
+          if (data.daily_trends) setDailyTrends(data.daily_trends);
+          if (data.med_category_share) setCategoryShare(data.med_category_share);
+          if (data.recent_feed) setRecentFeed(data.recent_feed);
+          if (data.total_consultations) setTotalConsultations(data.total_consultations);
+          if (data.dengue_cases) setDengueCount(data.dengue_cases);
+          if (data.diarrhea_cases) setDiarrheaCount(data.diarrhea_cases);
+          if (data.drap_units_allocated) setDrapUnits(data.drap_units_allocated);
+          setIsLiveConnected(true);
+        }
+      } catch (err) {
+        console.warn("[Dashboard Live Sync] Retaining cached state, backend offline:", err);
+        setIsLiveConnected(false);
+      } finally {
+        setIsRefreshing(false);
+      }
+    }
+
+    fetchDashboardMetrics();
+    const interval = setInterval(fetchDashboardMetrics, 10000); // 10s auto-refresh
+    return () => clearInterval(interval);
+  }, []);
+
   // Filtered Symptoms
   const filteredSymptoms = useMemo(() => {
-    if (selectedCategory === "all") return SYMPTOM_DATA;
-    return SYMPTOM_DATA.filter((s) => s.category === selectedCategory);
-  }, [selectedCategory]);
+    if (selectedCategory === "all") return symptomsData;
+    return symptomsData.filter((s) => s.category === selectedCategory);
+  }, [selectedCategory, symptomsData]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col">
@@ -122,7 +167,7 @@ export default function AdminAnalyticsDashboard() {
                   ShifaScribe Surveillance &amp; Analytics
                 </h1>
                 <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 font-mono font-medium">
-                  Admin Dashboard • Sprint 4
+                  Live PostgreSQL Sync
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -143,9 +188,13 @@ export default function AdminAnalyticsDashboard() {
               <span>🩺 Doctor Consultation Screen</span>
             </Link>
 
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/60 border border-emerald-800/40 text-xs text-emerald-400 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Surveillance Grid Active</span>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+              isLiveConnected
+                ? "bg-emerald-950/60 border-emerald-800/40 text-emerald-400"
+                : "bg-amber-950/60 border-amber-800/40 text-amber-400"
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isLiveConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+              <span>{isLiveConnected ? "Live PostgreSQL Stream Active" : "Offline Cache Mode"}</span>
             </div>
           </div>
         </div>
@@ -164,7 +213,7 @@ export default function AdminAnalyticsDashboard() {
                 +14.2%
               </span>
             </div>
-            <div className="text-2xl md:text-3xl font-extrabold text-white font-mono">1,842</div>
+            <div className="text-2xl md:text-3xl font-extrabold text-white font-mono">{totalConsultations.toLocaleString()}</div>
             <p className="text-[11px] text-slate-400 mt-1">
               AI Urdu voice scribed across 14 OPD outposts
             </p>
@@ -182,7 +231,7 @@ export default function AdminAnalyticsDashboard() {
                 +38.5% Surge
               </span>
             </div>
-            <div className="text-2xl md:text-3xl font-extrabold text-amber-300 font-mono">342 Cases</div>
+            <div className="text-2xl md:text-3xl font-extrabold text-amber-300 font-mono">{dengueCount} Cases</div>
             <p className="text-[11px] text-slate-400 mt-1">
               Concentrated in Rawalpindi &amp; Islamabad Sector G-9
             </p>
@@ -197,7 +246,7 @@ export default function AdminAnalyticsDashboard() {
                 +21.2%
               </span>
             </div>
-            <div className="text-2xl md:text-3xl font-extrabold text-teal-300 font-mono">285 Cases</div>
+            <div className="text-2xl md:text-3xl font-extrabold text-teal-300 font-mono">{diarrheaCount} Cases</div>
             <p className="text-[11px] text-slate-400 mt-1">
               Monitored for seasonal monsoon gastroenteritis
             </p>
@@ -209,7 +258,7 @@ export default function AdminAnalyticsDashboard() {
             <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
               <span className="font-semibold uppercase tracking-wider">DRAP Meds Allocated</span>
               <span className="text-cyan-400 font-bold bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-800/40">
-                5,680 Units
+                {drapUnits.toLocaleString()} Units
               </span>
             </div>
             <div className="text-2xl md:text-3xl font-extrabold text-purple-300 font-mono">98.4% Match</div>
@@ -384,7 +433,7 @@ export default function AdminAnalyticsDashboard() {
 
             <div className="mt-4 h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={DAILY_EPIDEMIC_TRENDS} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={dailyTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorDengue" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.8} />
@@ -443,7 +492,7 @@ export default function AdminAnalyticsDashboard() {
             <div className="mt-4 h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={MEDICATION_ALLOCATION_DATA}
+                  data={medicationsData}
                   margin={{ top: 15, right: 20, left: 0, bottom: 25 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
@@ -471,7 +520,7 @@ export default function AdminAnalyticsDashboard() {
                     ]}
                   />
                   <Bar dataKey="volume" radius={[8, 8, 0, 0]}>
-                    {MEDICATION_ALLOCATION_DATA.map((entry, index) => (
+                    {medicationsData.map((entry, index) => (
                       <Cell
                         key={`med-${index}`}
                         fill={
@@ -522,7 +571,7 @@ export default function AdminAnalyticsDashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={MED_CATEGORY_SHARE}
+                    data={categoryShare}
                     cx="50%"
                     cy="50%"
                     innerRadius={50}
@@ -530,7 +579,7 @@ export default function AdminAnalyticsDashboard() {
                     paddingAngle={4}
                     dataKey="value"
                   >
-                    {MED_CATEGORY_SHARE.map((entry, index) => (
+                    {categoryShare.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -549,7 +598,7 @@ export default function AdminAnalyticsDashboard() {
 
             {/* Legend list */}
             <div className="space-y-1.5 text-xs">
-              {MED_CATEGORY_SHARE.map((cat, idx) => (
+              {categoryShare.map((cat, idx) => (
                 <div key={idx} className="flex items-center justify-between text-slate-300">
                   <span className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color }} />
@@ -594,7 +643,7 @@ export default function AdminAnalyticsDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {RECENT_LIVE_SURVEILLANCE_FEED.map((row, idx) => (
+                {recentFeed.map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
                     <td className="py-3 px-3 font-mono font-bold text-cyan-400">{row.token}</td>
                     <td className="py-3 px-3 text-slate-300 font-medium">{row.region}</td>
