@@ -28,19 +28,44 @@ interface PrescriptionFormProps {
   structuredData?: StructuredEhrData | null;
   rawTranscript?: string;
   status?: "idle" | "uploading" | "processing_ai" | "completed" | "failed";
+  patientId?: number | string;
+  patientName?: string;
+  patientAge?: string | number;
+  patientGender?: string;
+  patientToken?: string;
+  consultationId?: number;
 }
 
 export default function PrescriptionForm({
   structuredData,
   rawTranscript,
   status = "idle",
+  patientId = 104,
+  patientName: propPatientName,
+  patientAge: propPatientAge,
+  patientGender: propPatientGender,
+  patientToken: propPatientToken,
+  consultationId,
 }: PrescriptionFormProps) {
   // Patient & Doctor Context State (Editable)
-  const [patientName, setPatientName] = useState<string>("Muhammad Tariq");
-  const [patientAge, setPatientAge] = useState<string>("45 yrs");
-  const [patientGender, setPatientGender] = useState<string>("Male");
-  const [patientToken, setPatientToken] = useState<string>("#104");
+  const [patientName, setPatientName] = useState<string>(propPatientName || "Muhammad Tariq");
+  const [patientAge, setPatientAge] = useState<string>(propPatientAge ? String(propPatientAge) : "45 yrs");
+  const [patientGender, setPatientGender] = useState<string>(propPatientGender || "Male");
+  const [patientToken, setPatientToken] = useState<string>(propPatientToken || "#104");
   const [doctorName, setDoctorName] = useState<string>("Dr. Arsam Khan (General Physician)");
+
+  // Database Write-back State (Day 28)
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+
+  // Sync prop changes
+  useEffect(() => {
+    if (propPatientName) setPatientName(propPatientName);
+    if (propPatientAge) setPatientAge(String(propPatientAge));
+    if (propPatientGender) setPatientGender(propPatientGender);
+    if (propPatientToken) setPatientToken(propPatientToken);
+  }, [propPatientName, propPatientAge, propPatientGender, propPatientToken]);
 
   // Form State (100% Editable via useState)
   const [symptoms, setSymptoms] = useState<string[]>([]);
@@ -165,10 +190,60 @@ ${clinicalNotes || "Standard OPD Follow-up & Care."}
     setTimeout(() => setCopied(false), 2500);
   };
 
+  // Day 28: Live Supabase / PostgreSQL Database Write-Back Helper
+  const saveToDatabase = async (): Promise<boolean> => {
+    setIsSaving(true);
+    setSaveErrorMessage(null);
+    setSaveSuccessMessage(null);
+
+    const pid = typeof patientId === "number" ? patientId : parseInt(String(patientId).replace(/[^0-9]/g, ""), 10) || 104;
+    const backendUrl = typeof window !== "undefined"
+      ? `http://${window.location.hostname || "localhost"}:8000`
+      : "http://localhost:8000";
+
+    try {
+      const payload = {
+        consultation_id: consultationId || undefined,
+        doctor_id: 4,
+        symptoms: symptoms,
+        medications: medications,
+        medications_detailed: structuredData?.medications_detailed || [],
+        dosage_frequency: dosageFrequency || "As Directed",
+        duration: duration || "Not Specified",
+        clinical_notes: clinicalNotes || "Prescription generated & approved by attending consultant.",
+        transcription_text: rawTranscript || "",
+      };
+
+      const res = await fetch(`${backendUrl}/api/consultation/${pid}/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.detail || `Server returned HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setSavedStatus(true);
+      setSaveSuccessMessage(`✓ Record saved to Supabase PostgreSQL (Log #${data.consultation_id})`);
+      setIsSaving(false);
+      setTimeout(() => {
+        setSaveSuccessMessage(null);
+      }, 6000);
+      return true;
+    } catch (err: any) {
+      console.error("Supabase Save Error:", err);
+      setSaveErrorMessage(err.message || "Failed to save record to database");
+      setIsSaving(false);
+      return false;
+    }
+  };
+
   // Save to EHR Record Handler
-  const handleSaveEhr = () => {
-    setSavedStatus(true);
-    setTimeout(() => setSavedStatus(false), 3500);
+  const handleSaveEhr = async () => {
+    await saveToDatabase();
   };
 
   // Reset Form Handler
@@ -179,12 +254,19 @@ ${clinicalNotes || "Standard OPD Follow-up & Care."}
     setDuration("");
     setClinicalNotes("");
     setSavedStatus(false);
+    setSaveSuccessMessage(null);
+    setSaveErrorMessage(null);
   };
 
-  // Save & Print Handler (Triggers window.print())
-  const handlePrintPrescription = () => {
-    setSavedStatus(true);
-    window.print();
+  // Save & Print Handler: Only triggers window.print() after DB confirmation
+  const handlePrintPrescription = async () => {
+    const savedSuccessfully = await saveToDatabase();
+    if (savedSuccessfully) {
+      // Small timeout to allow UI rendering before system print dialog pauses JS
+      setTimeout(() => {
+        window.print();
+      }, 200);
+    }
   };
 
   return (
@@ -451,32 +533,58 @@ ${clinicalNotes || "Standard OPD Follow-up & Care."}
           </div>
 
           {/* Right Action Group: Save EHR & Save & Print */}
-          <div className="flex items-center gap-3">
-            {savedStatus && (
-              <span className="text-xs text-emerald-400 font-medium animate-pulse">
-                ✓ Saved to Patient Consultation Log!
+          <div className="flex flex-wrap items-center gap-3">
+            {saveSuccessMessage && (
+              <span className="text-xs text-emerald-400 font-medium animate-pulse flex items-center gap-1.5 bg-emerald-950/60 border border-emerald-800/40 px-3 py-1 rounded-lg">
+                <span>✓</span>
+                <span>{saveSuccessMessage}</span>
+              </span>
+            )}
+
+            {saveErrorMessage && (
+              <span className="text-xs text-red-400 font-medium flex items-center gap-1.5 bg-red-950/60 border border-red-800/40 px-3 py-1 rounded-lg">
+                <span>⚠️</span>
+                <span>{saveErrorMessage}</span>
               </span>
             )}
             
             <button
               type="button"
+              disabled={isSaving}
               onClick={handleSaveEhr}
-              className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
             >
-              Save to Patient EHR
+              {isSaving ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></span>
+                  <span>Saving to DB...</span>
+                </>
+              ) : (
+                <span>Save to Patient EHR</span>
+              )}
             </button>
 
             {/* Primary Save & Print Button */}
             <button
               type="button"
               id="save-and-print-btn"
+              disabled={isSaving}
               onClick={handlePrintPrescription}
-              className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all transform active:scale-95 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all transform active:scale-95 disabled:opacity-50 cursor-pointer"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              <span>Save &amp; Print</span>
+              {isSaving ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></span>
+                  <span>Storing &amp; Preparing Print...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  <span>Save &amp; Print</span>
+                </>
+              )}
             </button>
           </div>
         </div>

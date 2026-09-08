@@ -4,7 +4,8 @@ import time
 import shutil
 import json
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel
 
 # Force UTF-8 output on Windows so emoji in print() don't crash the worker thread
 os.environ["PYTHONIOENCODING"] = "utf-8"
@@ -694,5 +695,205 @@ def get_patient_history(
         "total_encounters": len(history),
         "history": history,
     }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DAY 28: PATIENT INTAKE & LIVE DATABASE CONSULTATION WRITE-BACK
+# ─────────────────────────────────────────────────────────────────────────────
+
+class PatientCreateRequest(BaseModel):
+    name: str
+    age: Optional[int] = 40
+    gender: Optional[str] = "Male"
+    opd_token: Optional[str] = None
+
+class ConsultationSaveRequest(BaseModel):
+    consultation_id: Optional[int] = None
+    doctor_id: Optional[int] = 4
+    symptoms: Optional[List[str]] = []
+    medications: Optional[List[str]] = []
+    medications_detailed: Optional[List[Dict[str, Any]]] = []
+    dosage_frequency: Optional[str] = None
+    duration: Optional[str] = None
+    clinical_notes: Optional[str] = None
+    transcription_text: Optional[str] = None
+
+@app.post("/api/patients/new", status_code=status.HTTP_201_CREATED)
+def create_new_patient(payload: PatientCreateRequest, db: Session = Depends(get_db)):
+    """
+    Day 28 Task 1: Creates a new patient in PostgreSQL/Supabase database.
+    Returns generated patient_id and OPD token.
+    """
+    try:
+        token = payload.opd_token
+        if not token:
+            latest = db.query(models.Patient).order_by(models.Patient.id.desc()).first()
+            next_num = (latest.id + 104) if latest and latest.id else 105
+            token = f"#{next_num}"
+        else:
+            token = token.strip()
+            if not token.startswith("#"):
+                token = f"#{token}"
+
+        # Ensure token uniqueness
+        existing = db.query(models.Patient).filter(models.Patient.opd_token == token).first()
+        if existing:
+            token = f"{token}-{uuid.uuid4().hex[:3].upper()}"
+
+        new_patient = models.Patient(
+            name=payload.name.strip(),
+            age=payload.age or 40,
+            gender=payload.gender or "Male",
+            opd_token=token,
+        )
+        db.add(new_patient)
+        db.commit()
+        db.refresh(new_patient)
+
+        print(f"[ShifaScribe DB] Created new patient: ID={new_patient.id}, Name='{new_patient.name}', Token={new_patient.opd_token}")
+
+        return {
+            "status": "success",
+            "message": "Patient intake registered successfully",
+            "patient_id": new_patient.id,
+            "name": new_patient.name,
+            "age": new_patient.age,
+            "gender": new_patient.gender,
+            "opd_token": new_patient.opd_token,
+            "created_at": new_patient.created_at.isoformat() if new_patient.created_at else datetime.utcnow().isoformat(),
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create patient: {str(e)}",
+        )
+
+@app.get("/api/patients/{patient_id}")
+def get_patient_profile(patient_id: str, db: Session = Depends(get_db)):
+    """
+    Fetches patient profile details by numeric ID or OPD token.
+    """
+    clean_id = patient_id.strip().lstrip("#")
+    patient = None
+    if clean_id.isdigit():
+        patient = db.query(models.Patient).filter(models.Patient.id == int(clean_id)).first()
+    if not patient:
+        patient = db.query(models.Patient).filter(
+            (models.Patient.opd_token == patient_id.strip())
+            | (models.Patient.opd_token == f"#{clean_id}")
+            | (models.Patient.name.ilike(f"%{clean_id}%"))
+        ).first()
+
+    if not patient:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Patient '{patient_id}' not found.",
+        )
+
+    return {
+        "status": "success",
+        "patient_id": patient.id,
+        "name": patient.name,
+        "age": patient.age,
+        "gender": patient.gender,
+        "opd_token": patient.opd_token,
+        "created_at": patient.created_at.isoformat() if patient.created_at else datetime.utcnow().isoformat(),
+    }
+
+@app.post("/api/consultation/{patient_id}/save")
+def save_consultation_payload(
+    patient_id: int,
+    payload: ConsultationSaveRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Day 28 Task 2: Saves/updates the finalized clinical prescription and consultation log in the database.
+    Commits structured EHR JSON payload to consultation_logs.
+    """
+    try:
+        # Verify patient exists (or create if missing)
+        patient = db.query(models.Patient).filter(models.Patient.id == patient_id).first()
+        if not patient:
+            patient = models.Patient(
+                id=patient_id,
+                name=f"Patient #{patient_id}",
+                age=40,
+                gender="Male",
+                opd_token=f"#{patient_id}"
+            )
+            db.add(patient)
+            db.commit()
+            db.refresh(patient)
+
+        # Structure EHR dictionary
+        structured_ehr_data = {
+            "symptoms": payload.symptoms or [],
+            "medications": payload.medications or [],
+            "medications_detailed": payload.medications_detailed or [],
+            "dosage_frequency": payload.dosage_frequency or "As Directed",
+            "duration": payload.duration or "Not Specified",
+            "clinical_notes": payload.clinical_notes or "Prescription saved and printed.",
+            "saved_at": datetime.utcnow().isoformat(),
+        }
+        structured_ehr_json = json.dumps(structured_ehr_data)
+
+        # Find existing consultation log or create new
+        consultation = None
+        if payload.consultation_id:
+            consultation = db.query(models.ConsultationLog).filter(
+                models.ConsultationLog.id == payload.consultation_id
+            ).first()
+
+        if not consultation:
+            # Check if there's an existing consultation for this patient
+            consultation = db.query(models.ConsultationLog).filter(
+                models.ConsultationLog.patient_id == patient_id
+            ).order_by(models.ConsultationLog.created_at.desc()).first()
+
+        if consultation:
+            # Update existing record
+            consultation.status = "completed"
+            consultation.structured_ehr = structured_ehr_json
+            if payload.transcription_text:
+                consultation.transcription_text = payload.transcription_text
+            if payload.doctor_id:
+                consultation.doctor_id = payload.doctor_id
+            db.commit()
+            db.refresh(consultation)
+            print(f"[ShifaScribe DB] Updated ConsultationLog #{consultation.id} for Patient #{patient_id}")
+        else:
+            # Create a new consultation record
+            consultation = models.ConsultationLog(
+                patient_id=patient_id,
+                doctor_id=payload.doctor_id or 4,
+                audio_file_path="manual_consultation_save",
+                file_size_kb=0.0,
+                mime_type="application/json",
+                status="completed",
+                transcription_text=payload.transcription_text or "",
+                structured_ehr=structured_ehr_json,
+            )
+            db.add(consultation)
+            db.commit()
+            db.refresh(consultation)
+            print(f"[ShifaScribe DB] Created new ConsultationLog #{consultation.id} for Patient #{patient_id}")
+
+        return {
+            "status": "saved",
+            "message": "Prescription and EHR record successfully stored in database",
+            "consultation_id": consultation.id,
+            "patient_id": patient_id,
+            "patient_name": patient.name,
+            "opd_token": patient.opd_token,
+            "structured_ehr": structured_ehr_data,
+            "saved_at": datetime.utcnow().isoformat(),
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save consultation: {str(e)}",
+        )
+
 
 

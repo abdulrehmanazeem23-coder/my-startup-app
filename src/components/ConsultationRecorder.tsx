@@ -18,6 +18,7 @@ interface ConsultationRecorderProps {
     text: string,
     structuredData?: StructuredEhrData | null
   ) => void;
+  patientId?: string | number;
 }
 
 const getBackendUrl = () => {
@@ -30,6 +31,7 @@ const getBackendUrl = () => {
 export default function ConsultationRecorder({
   onStateChange,
   onTranscriptionUpdate,
+  patientId = "104",
 }: ConsultationRecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [seconds, setSeconds] = useState(0);
@@ -107,7 +109,7 @@ export default function ConsultationRecorder({
         ? ".mp4"
         : ".webm";
       formData.append("file", blob, `opd_recording${extension}`);
-      formData.append("patient_id", "104");
+      formData.append("patient_id", String(patientId || "104"));
       formData.append("doctor_id", "4");
 
       console.log(
