@@ -56,11 +56,18 @@ export default function DoctorConsultScreen() {
           {/* OPD Clinic & Doctor Badges + Dashboard Link */}
           <div className="flex items-center gap-3">
             <Link
+              href="/history"
+              className="px-3.5 py-1.5 rounded-xl bg-teal-950/60 hover:bg-teal-900/60 border border-teal-800/50 text-teal-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm hover:border-teal-500/60 cursor-pointer"
+            >
+              <span>📋</span>
+              <span>Patient History</span>
+            </Link>
+            <Link
               href="/dashboard"
               className="px-3.5 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-800/50 text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm hover:border-cyan-500/60 cursor-pointer"
             >
               <span>📊</span>
-              <span>Admin Surveillance Dashboard</span>
+              <span>Admin Surveillance</span>
             </Link>
 
             <div className="hidden lg:flex items-center gap-3">
