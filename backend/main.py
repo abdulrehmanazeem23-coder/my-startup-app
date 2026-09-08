@@ -30,7 +30,7 @@ def init_db_safely():
         print("[ShifaScribe DB Warning] Please verify your database credentials in .env file.")
 
 def ensure_db_columns():
-    """Safety migration helper to ensure new columns exist in SQLite/PostgreSQL database."""
+    """Safety migration helper to ensure new columns exist in SQLite/PostgreSQL/Supabase database."""
     try:
         if engine.dialect.name == "sqlite":
             with engine.connect() as conn:
@@ -44,6 +44,16 @@ def ensure_db_columns():
                     conn.execute(text("ALTER TABLE consultation_logs ADD COLUMN structured_ehr TEXT;"))
                     print("[ShifaScribe DB Migration] Added 'structured_ehr' column to consultation_logs!")
                 conn.commit()
+        elif engine.dialect.name == "postgresql":
+            with engine.connect() as conn:
+                from sqlalchemy import text
+                conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS gender VARCHAR(50) DEFAULT 'Male';"))
+                conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS opd_token VARCHAR(50);"))
+                conn.execute(text("ALTER TABLE patients ADD COLUMN IF NOT EXISTS cnic VARCHAR(50);"))
+                conn.execute(text("ALTER TABLE consultation_logs ADD COLUMN IF NOT EXISTS transcription_text TEXT;"))
+                conn.execute(text("ALTER TABLE consultation_logs ADD COLUMN IF NOT EXISTS structured_ehr TEXT;"))
+                conn.commit()
+                print("[ShifaScribe DB Migration] Verified/migrated PostgreSQL/Supabase columns successfully!")
     except Exception as err:
         print(f"[ShifaScribe DB Migration Info] Column check: {err}")
 
